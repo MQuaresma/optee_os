@@ -62,6 +62,10 @@ FUNC _start , :
 	mov	x20, x2		/* Save DT address */
 #endif
 
+#if defined(CFG_DEVICE_ATTESTATION)
+    mov x21, x3     /* Save attestation key blob address */
+#endif
+
 	adr	x0, reset_vect_table
 	msr	vbar_el1, x0
 	isb
@@ -207,6 +211,7 @@ clear_nex_bss:
 	mov	x0, x19		/* pagable part address */
 	mov	x1, #-1
 	mov	x2, x20		/* DT address */
+    mov x3, x21     /* Key blob address */
 	bl	generic_boot_init_primary
 
 	/*

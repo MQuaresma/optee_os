@@ -1139,7 +1139,8 @@ void init_tee_runtime(void)
 }
 
 static void init_primary_helper(unsigned long pageable_part,
-				unsigned long nsec_entry, unsigned long fdt)
+                                unsigned long nsec_entry, unsigned long fdt,
+                                unsigned long kb)
 {
 	/*
 	 * Mask asynchronous exceptions before switch to the thread vector
@@ -1156,6 +1157,11 @@ static void init_primary_helper(unsigned long pageable_part,
 #ifndef CFG_VIRTUALIZATION
 	thread_init_boot_thread();
 #endif
+
+#ifdef CFG_DEVICE_ATTESTATION
+    DMSG("Attestation key blob address: 0x%" PRIx64, kb);
+#endif
+
 	thread_init_primary(generic_boot_get_handlers());
 	thread_init_per_cpu();
 	init_sec_mon(nsec_entry);
@@ -1213,15 +1219,16 @@ static void init_secondary_helper(unsigned long nsec_entry)
  * the unpaged area.
  */
 void __weak generic_boot_init_primary(unsigned long pageable_part,
-				      unsigned long nsec_entry __maybe_unused,
-				      unsigned long fdt)
+                                      unsigned long nsec_entry __maybe_unused,
+                                      unsigned long fdt,
+                                      unsigned long kb)
 {
 	unsigned long e = PADDR_INVALID;
 
 #if !defined(CFG_WITH_ARM_TRUSTED_FW)
 	e = nsec_entry;
 #endif
-	init_primary_helper(pageable_part, e, fdt);
+	init_primary_helper(pageable_part, e, fdt, kb);
 }
 
 #if defined(CFG_WITH_ARM_TRUSTED_FW)
