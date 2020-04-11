@@ -47,6 +47,11 @@
 #include <libfdt.h>
 #endif
 
+#if defined(CFG_DEVICE_ATTESTATION)
+#include <kernel/tee_common_otp.h>
+#include <qds_attest.h>
+#endif
+
 /*
  * In this file we're using unsigned long to represent physical pointers as
  * they are received in a single register when OP-TEE is initially entered.
@@ -1138,6 +1143,21 @@ void init_tee_runtime(void)
 		panic();
 }
 
+
+static void init_attestation_ta(unsigned long kb){
+    TEE_TASessionHandle sess;
+    TEE_UUID au = PTA_ATTEST_UUID;
+    TEE_Result res;
+    struct tee_hw_unique_key hwk;
+    uint32_t eo;
+
+    DMSG("Attestation key blob address: %p", kb);
+    DMSG("First byte of the certificate: 0x%" PRIx8, *(uint8_t*)kb);
+    tee_otp_get_hw_unique_key(&hwk);
+	res = import_attestation_key(kb);
+}
+
+
 static void init_primary_helper(unsigned long pageable_part,
                                 unsigned long nsec_entry, unsigned long fdt,
                                 unsigned long kb)
@@ -1159,7 +1179,7 @@ static void init_primary_helper(unsigned long pageable_part,
 #endif
 
 #ifdef CFG_DEVICE_ATTESTATION
-    DMSG("Attestation key blob address: 0x%" PRIx64, kb);
+	init_attestation_ta(kb);
 #endif
 
 	thread_init_primary(generic_boot_get_handlers());
