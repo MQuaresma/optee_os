@@ -22,6 +22,7 @@ void __section(".text.dummy.generic_boot_init_primary")
 generic_boot_init_primary(unsigned long pageable_part __unused,
                           unsigned long nsec_entry __unused,
                           unsigned long fdt __unused,
-                          unsigned long kb __unused)
+                          unsigned long kb __unused,
+						  size_t dc_size __unused)
 {
 }

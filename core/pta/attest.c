@@ -9,7 +9,7 @@
 #include<tee/tee_obj.h>
 #include<tee_api_defines.h>
 #include<stdbool.h>
-#include<qds_attest.h>
+#include<pta_attest.h>
 
 
 /* Signs a binary blob corresponding to the byte representation of a CSR
@@ -164,8 +164,9 @@ static TEE_Result store_attest_material(void *kpp_raw, struct tee_pobj *kp_pobj,
     return res;
 }
 
-TEE_Result import_attestation_key(unsigned long kb){
-    	DMSG("Attestation key blob address: 0x%" PRIx64, kb);
+TEE_Result import_attestation_key(void *dc, size_t dc_size){
+	//TODO: store certificate in secure storage once session point
+	//is created and extract signing key
 	return TEE_SUCCESS;
 }
 

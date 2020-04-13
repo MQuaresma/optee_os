@@ -11,4 +11,4 @@ srcs-$(CFG_WITH_STATS) += stats.c
 srcs-$(CFG_SYSTEM_PTA) += system.c
 
 subdirs-y += bcm
-srcs-y += qds_attest.c
+srcs-$(CFG_DEVICE_ATTESTATION) += attest.c

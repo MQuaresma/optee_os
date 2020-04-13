@@ -49,7 +49,7 @@
 
 #if defined(CFG_DEVICE_ATTESTATION)
 #include <kernel/tee_common_otp.h>
-#include <qds_attest.h>
+#include <attest.h>
 #endif
 
 /*
@@ -1144,23 +1144,24 @@ void init_tee_runtime(void)
 }
 
 
-static void init_attestation_ta(unsigned long kb){
-    TEE_TASessionHandle sess;
-    TEE_UUID au = PTA_ATTEST_UUID;
+static void init_attestation_ta(unsigned long kb, size_t dc_size){
     TEE_Result res;
     struct tee_hw_unique_key hwk;
-    uint32_t eo;
+	uint64_t* dc = phys_to_virt(kb, MEM_AREA_NSEC_SHM);
 
-    DMSG("Attestation key blob address: %p", kb);
-    DMSG("First byte of the certificate: 0x%" PRIx8, *(uint8_t*)kb);
+    DMSG("Device certificate at address: %#"PRIx64, kb);
+
     tee_otp_get_hw_unique_key(&hwk);
-	res = import_attestation_key(kb);
+	res = import_attestation_key(dc, dc_size);
+
+	memset(dc, 0, dc_size);
 }
 
 
 static void init_primary_helper(unsigned long pageable_part,
                                 unsigned long nsec_entry, unsigned long fdt,
-                                unsigned long kb)
+                                unsigned long kb,
+								size_t dc_size)
 {
 	/*
 	 * Mask asynchronous exceptions before switch to the thread vector
@@ -1179,7 +1180,7 @@ static void init_primary_helper(unsigned long pageable_part,
 #endif
 
 #ifdef CFG_DEVICE_ATTESTATION
-	init_attestation_ta(kb);
+	init_attestation_ta(kb, dc_size);
 #endif
 
 	thread_init_primary(generic_boot_get_handlers());
@@ -1241,14 +1242,15 @@ static void init_secondary_helper(unsigned long nsec_entry)
 void __weak generic_boot_init_primary(unsigned long pageable_part,
                                       unsigned long nsec_entry __maybe_unused,
                                       unsigned long fdt,
-                                      unsigned long kb)
+                                      unsigned long kb,
+									  size_t dc_size)
 {
 	unsigned long e = PADDR_INVALID;
 
 #if !defined(CFG_WITH_ARM_TRUSTED_FW)
 	e = nsec_entry;
 #endif
-	init_primary_helper(pageable_part, e, fdt, kb);
+	init_primary_helper(pageable_part, e, fdt, kb, dc_size);
 }
 
 #if defined(CFG_WITH_ARM_TRUSTED_FW)
