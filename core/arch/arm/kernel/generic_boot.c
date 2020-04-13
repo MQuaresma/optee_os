@@ -48,8 +48,7 @@
 #endif
 
 #if defined(CFG_DEVICE_ATTESTATION)
-#include <kernel/tee_common_otp.h>
-#include <attest.h>
+#include <pta_attest.h>
 #endif
 
 /*
@@ -1146,15 +1145,16 @@ void init_tee_runtime(void)
 
 static void init_attestation_ta(unsigned long kb, size_t dc_size){
     TEE_Result res;
-    struct tee_hw_unique_key hwk;
 	uint64_t* dc = phys_to_virt(kb, MEM_AREA_NSEC_SHM);
 
     DMSG("Device certificate at address: %#"PRIx64, kb);
 
-    tee_otp_get_hw_unique_key(&hwk);
 	res = import_attestation_key(dc, dc_size);
+	if(res)
+		DMSG("Failed to import the attestation certificate");
+	assert(res==0);
 
-	memset(dc, 0, dc_size);
+	memset(dc, 0, dc_size); //overwrite buffer
 }
 
 

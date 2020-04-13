@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include<crypto/crypto.h>
+#include <kernel/tee_common_otp.h>
 #include<kernel/pseudo_ta.h>
 #include<kernel/user_ta.h>
 #include<tee/tee_fs.h>
@@ -167,6 +168,7 @@ static TEE_Result store_attest_material(void *kpp_raw, struct tee_pobj *kp_pobj,
 TEE_Result import_attestation_key(void *dc, size_t dc_size){
 	//TODO: store certificate in secure storage once session point
 	//is created and extract signing key
+    tee_otp_get_hw_unique_key(&hwk);
 	return TEE_SUCCESS;
 }
 
