@@ -1143,25 +1143,26 @@ void init_tee_runtime(void)
 }
 
 
-static void init_attestation_ta(unsigned long kb, size_t dc_size){
+static void init_attestation_ta(unsigned long dcak_b, size_t dc_l, size_t ak_l){
     TEE_Result res;
-	uint64_t* dc = phys_to_virt(kb, MEM_AREA_NSEC_SHM);
+	uint64_t* dcak_p = phys_to_virt(dcak_b, MEM_AREA_NSEC_SHM);
 
-    DMSG("Device certificate at address: %#"PRIx64, kb);
+    DMSG("Attestation blob at address: %#"PRIx64, dcak_b);
 
-	res = import_attestation_key(dc, dc_size);
+	res = import_attestation_key(dcak_p, dc_l, ak_l);
 	if(res)
 		DMSG("Failed to import the attestation certificate");
 	assert(res==0);
 
-	memset(dc, 0, dc_size); //overwrite buffer
+	memset(dcak_p, 0, dc_l+ak_l); //overwrite buffer
 }
 
 
 static void init_primary_helper(unsigned long pageable_part,
                                 unsigned long nsec_entry, unsigned long fdt,
-                                unsigned long kb,
-								size_t dc_size)
+                                unsigned long dcak_b,
+								size_t dc_l,
+								size_t ak_l)
 {
 	/*
 	 * Mask asynchronous exceptions before switch to the thread vector
@@ -1177,10 +1178,6 @@ static void init_primary_helper(unsigned long pageable_part,
 
 #ifndef CFG_VIRTUALIZATION
 	thread_init_boot_thread();
-#endif
-
-#ifdef CFG_DEVICE_ATTESTATION
-	init_attestation_ta(kb, dc_size);
 #endif
 
 	thread_init_primary(generic_boot_get_handlers());
@@ -1208,6 +1205,11 @@ static void init_primary_helper(unsigned long pageable_part,
 	IMSG("Initializing virtualization support");
 	core_mmu_init_virtualization();
 #endif
+#ifdef CFG_DEVICE_ATTESTATION
+	init_attestation_ta(dcak_b, dc_l, ak_l);
+#endif
+
+
 	DMSG("Primary CPU switching to normal world boot");
 }
 
@@ -1242,15 +1244,16 @@ static void init_secondary_helper(unsigned long nsec_entry)
 void __weak generic_boot_init_primary(unsigned long pageable_part,
                                       unsigned long nsec_entry __maybe_unused,
                                       unsigned long fdt,
-                                      unsigned long kb,
-									  size_t dc_size)
+                                      unsigned long dcak_b,
+									  size_t dc_l,
+									  size_t ak_l)
 {
 	unsigned long e = PADDR_INVALID;
 
 #if !defined(CFG_WITH_ARM_TRUSTED_FW)
 	e = nsec_entry;
 #endif
-	init_primary_helper(pageable_part, e, fdt, kb, dc_size);
+	init_primary_helper(pageable_part, e, fdt, dcak_b, dc_l, ak_l);
 }
 
 #if defined(CFG_WITH_ARM_TRUSTED_FW)

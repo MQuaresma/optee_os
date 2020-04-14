@@ -63,8 +63,9 @@ FUNC _start , :
 #endif
 
 #if defined(CFG_DEVICE_ATTESTATION)
-    mov x21, x3     /* Device certificate address */
+    mov x21, x3     /* Attestation blob address */
 	mov x22, x4 	/* Device certificate size */
+	mov x23, x5 	/* Attestation key size */
 #endif
 
 	adr	x0, reset_vect_table
@@ -187,7 +188,8 @@ clear_nex_bss:
 	 */	
 	mov x0, x21
 	mov x1, x22
-	bl relocate_cert
+	mov x2, x23
+	bl relocate_dckb
 #endif
 
 #ifdef CFG_CORE_ASLR
@@ -222,8 +224,9 @@ clear_nex_bss:
 	mov	x0, x19		/* pagable part address */
 	mov	x1, #-1
 	mov	x2, x20		/* DT address */
-	mov x3, x21     /* DC address */
+	mov x3, x21     /* AB address */
 	mov x4, x22 	/* DC length */
+	mov x5, x23 	/* AK length */
 	bl	generic_boot_init_primary
 
 	/*
@@ -319,28 +322,36 @@ END_FUNC relocate
 
 
 #ifdef CFG_DEVICE_ATTESTATION
-LOCAL_FUNC relocate_cert , :
-	mov_imm x2, TEE_SHMEM_START
-	mov_imm x3, TEE_SHMEM_SIZE
+/* void relocate_dckb(void *dck_blob, size_t *dc_l, size_t *ak_b)
+ *
+ * Copies the buffer stored in dck_blob, with size dc_l + ak_b,
+ * to the memory region used to share data between OPTEE and
+ * the normal OS
+ */
+LOCAL_FUNC relocate_dckb , :
+	mov_imm x3, TEE_SHMEM_START
+	mov_imm x4, TEE_SHMEM_SIZE
 	
-	cmp x1, x3
+	cmp x1, x4
 	bgt 	end
 	
-	mov x3, x2
-	add x4, x0, x1 /* end of certificate buffer */
+	mov x4, x3
+	add x5, x0, x1
+	add x5, x5, x2 /* end of attestation blob */
 loop:
-	ldr x5, [x0], #4
-	str x5, [x3], #4
+	ldr x6, [x0], #4
+	str x6, [x4], #4
 			
-	cmp x0,x4
+	cmp x0,x5
 	blt		loop
 	
 
-	mov x21, x2
+	mov x21, x3
 	mov x22, x1
+	mov x23, x2
 end:
 	ret
-END_FUNC relocate_cert
+END_FUNC relocate_dckb
 #endif
 
 
