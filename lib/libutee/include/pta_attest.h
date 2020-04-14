@@ -7,11 +7,14 @@
 #define PTA_NAME "attester.pta"
 
 #define ATTEST_CMD_SIGN 1
+#define ATTEST_CMD_GET_CERT 2
 
 struct attest_ctx{
     struct ecc_keypair *kp;
+	void *dc;
+	size_t dc_l;
 };
 
-TEE_Result import_attestation_key(void *dc, size_t dc_size);
+TEE_Result import_attestation_key(void *dcak_p, size_t dc_l, size_t ak_l);
 
 #endif

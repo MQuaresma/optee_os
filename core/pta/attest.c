@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include<crypto/crypto.h>
-#include <kernel/tee_common_otp.h>
+#include <kernel/huk_subkey.h>
 #include<kernel/pseudo_ta.h>
 #include<kernel/user_ta.h>
 #include<tee/tee_fs.h>
@@ -10,8 +10,10 @@
 #include<tee/tee_obj.h>
 #include<tee_api_defines.h>
 #include<stdbool.h>
+#include<string.h>
 #include<pta_attest.h>
 
+static struct attest_ctx ctx_i;
 
 /* Signs a binary blob corresponding to the byte representation of a CSR
  */
@@ -47,172 +49,138 @@ static TEE_Result sign_cert_blob(struct attest_ctx *ctx, uint32_t pt, TEE_Param 
     return TEE_SUCCESS;
 }
 
-static void free_ecc_keypair(struct ecc_keypair *kp){
-    free(kp->d);
-    free(kp->x);
-    free(kp->y);
-    free(kp);
-}
 
-
-static void close_session(void *psess_ctx){
-    struct ecc_keypair *kp = ((struct attest_ctx*)psess_ctx)->kp;
-    free_ecc_keypair(kp);
-    free(psess_ctx);
-}
-
-
-/* Loads signing key, used in attestation, from secure storage
+/* Dumps the device certificate in a buffer
  */
-static TEE_Result load_attest_material(struct ecc_keypair **kpp){
-    TEE_Result res = TEE_SUCCESS;
-    TEE_UUID uuid = PTA_ATTEST_UUID;
-    const struct tee_file_operations *fops = tee_svc_storage_file_ops(TEE_STORAGE_PRIVATE);
-    struct tee_file_handle *fh = NULL;
-    struct tee_pobj *kp_pobj;
-    struct tee_obj *kp_obj = tee_obj_alloc();
-    void *buf = NULL;
-    size_t buf_len = 1;
-
-    if(kp_obj){
-        res = tee_pobj_get(&uuid,
-                           &uuid, sizeof(TEE_UUID),
-                           TEE_DATA_FLAG_SHARE_READ | TEE_DATA_FLAG_ACCESS_READ,
-                           false, fops,
-                           &kp_pobj);
-
-        if(!res){
-            if(!(res = fops->open(kp_pobj, &buf_len, &fh))){
-                buf = calloc(buf_len, sizeof(uint8_t));
-                if(buf){
-                    res = fops->read(fh, 0, buf, &buf_len);
-                    if(!res){
-                        kp_obj->info.objectType = TEE_TYPE_ECDSA_KEYPAIR;
-                        kp_obj->attr = calloc(1, sizeof(struct ecc_keypair));
-
-                        if(!kp_obj->attr || crypto_acipher_alloc_ecc_keypair(kp_obj->attr, 256))
-                            res = TEE_ERROR_OUT_OF_MEMORY;
-                        else if (!(res = tee_obj_attr_from_binary(kp_obj, buf, buf_len))){
-                            *kpp = kp_obj->attr;
-                            (*kpp)->curve = TEE_ECC_CURVE_NIST_P256;
-                        }
-                    }
-                    free(buf);
-                } else res = TEE_ERROR_OUT_OF_MEMORY;
-                fops->close(&fh);
-            }
-            tee_pobj_release(kp_pobj);
-        }
-
-        kp_obj->attr = NULL;
-        tee_obj_free(kp_obj);
-    }
-    return res;
+static TEE_Result dump_dc(uint32_t pt, TEE_Param params[4]){
+    //TODO
+    return TEE_SUCCESS;
 }
 
 
 static TEE_Result open_session(uint32_t pt __unused, TEE_Param params[TEE_NUM_PARAMS] __unused, void **psess_ctx){
     TEE_Result res = TEE_SUCCESS;
     struct tee_ta_session *s = tee_ta_get_calling_session();
-    struct attest_ctx *ac;
 
     if(!s || !is_user_ta_ctx(s->ctx))
         return TEE_ERROR_ACCESS_DENIED;
 
-    ac = calloc(1, sizeof(struct attest_ctx));
-    if(!ac)
-        return TEE_ERROR_OUT_OF_MEMORY;
-
-    res = load_attest_material(&(ac->kp));
-
-    if(res)
-        return TEE_ERROR_CORRUPT_OBJECT;
-
-    *psess_ctx = ac;
+    *psess_ctx = &ctx_i;
     
     return res;
 }
 
 
-/* Stores, in secure storage, a pointer to the ECDSA keypair generated at startup
+/* Stores, in secure storage, the device certificate loaded at boot time
  */
-static TEE_Result store_attest_material(void *kpp_raw, struct tee_pobj *kp_pobj, struct tee_file_handle **fh, const struct tee_file_operations *fops){
-    TEE_Result res = TEE_SUCCESS;
-    struct ecc_keypair *kp = (struct ecc_keypair*)kpp_raw;
-    struct tee_obj *tmp_obj = tee_obj_alloc();
-    void *buf;
-    size_t buf_len;
-
-    if(tmp_obj){
-        tmp_obj->attr = kp;
-        tmp_obj->info.objectType = TEE_TYPE_ECDSA_KEYPAIR;
-
-        buf_len = crypto_bignum_num_bytes(kp->d) +  crypto_bignum_num_bytes(kp->x) +  crypto_bignum_num_bytes(kp->y) +  sizeof(kp->curve);
-        buf = calloc(buf_len, sizeof(uint8_t));
-
-        if(buf){
-            res = tee_obj_attr_to_binary(tmp_obj, buf, &buf_len);
-
-            res = fops->create(kp_pobj, true, NULL, 0, NULL, 0, buf, buf_len, fh);
-
-            free(buf);
-        }else res = TEE_ERROR_OUT_OF_MEMORY;
-
-        tmp_obj->attr = NULL;
-        tee_obj_free(tmp_obj);
-    } else res = TEE_ERROR_OUT_OF_MEMORY;
+static TEE_Result store_attest_material(struct tee_pobj *kp_pobj, 
+										struct tee_file_handle **fh, 
+										const struct tee_file_operations *fops){
+	TEE_Result res = TEE_SUCCESS;
+	res = fops->create(kp_pobj, true, NULL, 0, NULL, 0, ctx_i.dc, ctx_i.dc_l, fh);
+	if(!res){
+		free(ctx_i.dc);
+		ctx_i.dc = NULL;
+		//ctx_i.dc_l = 0;
+	}
 
     return res;
 }
 
-TEE_Result import_attestation_key(void *dc, size_t dc_size){
-	//TODO: store certificate in secure storage once session point
-	//is created and extract signing key
-    tee_otp_get_hw_unique_key(&hwk);
-	return TEE_SUCCESS;
-}
 
-/* Loads ECDSA keypair from x509 device certificate loaded at boot time
+/* Checks if the device certificate has been stored, and stores it in case it
+ * hasn't
  */
 static TEE_Result create(void){
     TEE_Result res = TEE_SUCCESS;
     TEE_UUID uuid = PTA_ATTEST_UUID;
     const struct tee_file_operations *fops = tee_svc_storage_file_ops(TEE_STORAGE_PRIVATE);
     struct tee_file_handle *fh = NULL;
-    struct tee_pobj *kp_pobj = NULL;
-    struct ecc_keypair *kp = NULL;
-    size_t obj_size = sizeof(void*);
+    struct tee_pobj *dc_obj = NULL;
+    size_t dc_objs = sizeof(void*);
 
     res = tee_pobj_get(&uuid,
                        &uuid, sizeof(TEE_UUID),
                        TEE_DATA_FLAG_ACCESS_WRITE | TEE_DATA_FLAG_SHARE_READ | TEE_DATA_FLAG_ACCESS_READ,
                        false, fops,
-                       &kp_pobj);
+                       &dc_obj);
     if(!res){
-        res = fops->open(kp_pobj, &obj_size, &fh);
-
-        if(!(res ^ TEE_ERROR_ITEM_NOT_FOUND) || !(res ^ TEE_ERROR_CORRUPT_OBJECT)){
-            /* Generate attestation key */
-            if(!(kp = calloc(1, sizeof(struct ecc_keypair))))
-                return TEE_ERROR_OUT_OF_MEMORY;
-
-            if(crypto_acipher_alloc_ecc_keypair(kp, 256)) 
-                return TEE_ERROR_OUT_OF_MEMORY;
-
-            kp->curve = TEE_ECC_CURVE_NIST_P256;
-
-            if(crypto_acipher_gen_ecc_key(kp))
-                return TEE_ERROR_GENERIC;
-
-            res = store_attest_material(kp, kp_pobj, &fh, fops);
-            free_ecc_keypair(kp);
-        }
+        res = fops->open(dc_obj, &dc_objs, &fh);
+        if(!(res ^ TEE_ERROR_ITEM_NOT_FOUND) || !(res ^ TEE_ERROR_CORRUPT_OBJECT))
+            res = store_attest_material(dc_obj, &fh, fops);
 
         fops->close(&fh);
-        tee_pobj_release(kp_pobj);
+        tee_pobj_release(dc_obj);
     }
-    
+
     return res;
+}
+
+
+/* Loads the attestation blob i.e. device certificate followed by the attestation
+ * key, encrypted using AES-CTR
+ */
+TEE_Result import_attestation_key(void *dcak_p, size_t dc_l, size_t ak_l){
+	TEE_Result res = TEE_SUCCESS;
+	void *ctx;
+	uint8_t *key;
+	size_t len = 16;
+	uint8_t *tmp;
+	size_t tmp_l = 16;
+
+	key = calloc(16, sizeof(uint8_t));
+	if(!key)
+		return TEE_ERROR_OUT_OF_MEMORY;
+
+	tmp = calloc(16, sizeof(uint8_t));
+	if(!tmp)
+		return TEE_ERROR_OUT_OF_MEMORY;
+
+	res = huk_subkey_derive(HUK_SUBKEY_ACC, NULL, 0, key, len);
+	if(res)
+		return res;
+
+	res = crypto_cipher_alloc_ctx(&ctx, TEE_ALG_AES_CTR);
+	if(res)
+		return res;
+
+	res = crypto_cipher_init(ctx, TEE_MODE_DECRYPT, key, len, NULL, 0, tmp, tmp_l);
+	if(res)
+		return res;
+
+	res = crypto_cipher_update(ctx, TEE_MODE_DECRYPT, 1, (uint8_t*)dcak_p + dc_l, ak_l, tmp);
+
+	if(res)
+		return res;
+	crypto_cipher_final(ctx);
+	crypto_cipher_free_ctx(ctx);
+
+	memset(key, 0, len*sizeof(uint8_t));
+	free(key);
+
+	ctx_i.kp = calloc(1, sizeof(struct ecc_keypair));
+	if(!ctx_i.kp)
+		return TEE_ERROR_OUT_OF_MEMORY;
+
+	res = crypto_acipher_alloc_ecc_keypair(ctx_i.kp, ak_l*8);
+	if(res)
+		return res;
+
+	res = crypto_bignum_bin2bn(tmp, tmp_l, ctx_i.kp->d);
+	if(res)
+		return res;
+
+	memset(tmp, 0, tmp_l*sizeof(uint8_t));
+	free(tmp);
+
+	ctx_i.dc = calloc(dc_l, sizeof(uint8_t));
+	if(!ctx_i.dc)
+		return TEE_ERROR_OUT_OF_MEMORY;
+
+	memcpy(ctx_i.dc, dcak_p, dc_l);
+	ctx_i.dc_l = dc_l;
+
+	return res;
 }
 
 
@@ -220,7 +188,10 @@ static TEE_Result invoke_command(void *psess, uint32_t cmd, uint32_t pt, TEE_Par
 
     switch(cmd){
     case ATTEST_CMD_SIGN:
-        return sign_cert_blob(psess, pt, params);
+		return TEE_SUCCESS;
+        //return sign_cert_blob(psess, pt, params);
+	case ATTEST_CMD_GET_CERT:
+        return dump_dc(pt, params);
     default:
         break;
     }
@@ -228,9 +199,9 @@ static TEE_Result invoke_command(void *psess, uint32_t cmd, uint32_t pt, TEE_Par
     return TEE_ERROR_NOT_IMPLEMENTED;
 }
 
+
 pseudo_ta_register(.uuid = PTA_ATTEST_UUID, .name = PTA_NAME,
                    .flags = PTA_DEFAULT_FLAGS,
                    .create_entry_point = create,
                    .open_session_entry_point = open_session,
-                   .close_session_entry_point = close_session,
                    .invoke_command_entry_point = invoke_command);
