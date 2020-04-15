@@ -53,8 +53,34 @@ static TEE_Result sign_cert_blob(struct attest_ctx *ctx, uint32_t pt, TEE_Param 
 /* Dumps the device certificate in a buffer
  */
 static TEE_Result dump_dc(uint32_t pt, TEE_Param params[4]){
-    //TODO
-    return TEE_SUCCESS;
+    TEE_Result res = TEE_SUCCESS;
+    TEE_UUID uuid = PTA_ATTEST_UUID;
+    const struct tee_file_operations *fops = tee_svc_storage_file_ops(TEE_STORAGE_PRIVATE);
+    struct tee_file_handle *fh = NULL;
+    struct tee_pobj *dc_obj = NULL;
+    size_t dc_objs = sizeof(void*);
+	uint32_t e_pt = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_OUTPUT,
+									TEE_PARAM_TYPE_NONE,
+									TEE_PARAM_TYPE_NONE,
+									TEE_PARAM_TYPE_NONE);
+	if(e_pt != pt)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	res = tee_pobj_get(&uuid,
+					   &uuid, sizeof(TEE_UUID),
+                       TEE_DATA_FLAG_ACCESS_WRITE | TEE_DATA_FLAG_SHARE_READ | TEE_DATA_FLAG_ACCESS_READ,
+					   false, fops,
+					   &dc_obj);
+	if(!res){
+		res = fops->open(dc_obj, &dc_objs, &fh);
+		if(!(res ^ TEE_ERROR_ITEM_NOT_FOUND) || !(res ^ TEE_ERROR_CORRUPT_OBJECT))
+			return res;
+		res = fops->read(fh, 0, params[0].memref.buffer, &params[0].memref.size);
+		fops->close(&fh);
+		tee_pobj_release(dc_obj);
+	}
+
+    return res;
 }
 
 
@@ -81,7 +107,7 @@ static TEE_Result store_attest_material(struct tee_pobj *kp_pobj,
 	if(!res){
 		free(ctx_i.dc);
 		ctx_i.dc = NULL;
-		//ctx_i.dc_l = 0;
+		ctx_i.dc_l = 0;
 	}
 
     return res;
