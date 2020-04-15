@@ -9,7 +9,6 @@ import math
 from mbedtls import x509, pk
 from mbedtls import hash as hashlib
 
-
 USAGE = '''Usage: {} [options] [ <file> -t <encoding> ]
 Options:
     -h Help
@@ -38,8 +37,9 @@ def gen_ca_cert():
     return ca_crt, ca_k
 
 
+# TODO: encrypt dc key
 def gen_dc(ca_crt, ca_k):
-    dc_k = pk.ECC(b'secp256r1')
+    dc_k = pk.ECC(curve=b'secp256r1')
     _ = dc_k.generate()
     dc_csr = x509.CSR.new(dc_k, 'CN=Haslab Device', hashlib.sha256())
     now = dt.datetime.utcnow()
@@ -52,11 +52,11 @@ def gen_dc(ca_crt, ca_k):
     with open(DC_CRT_F, 'w') as f:
         f.write(dc_crt.to_PEM())
 
-    with open('dc_ak', 'w') as f:
+    with open('dc_ak', 'wb') as f:
         dc_pk = dc_k.export_key('NUM')
         bl = math.ceil(dc_pk.bit_length()/8)
-        print(len(dc_pk.to_bytes(bl,'little')))
-        #f.write(dc_k.export_key('NUM'))
+        f.write(dc_pk.to_bytes(bl,'little'))
+
 
 def main():
     if len(sys.argv) > 1:
