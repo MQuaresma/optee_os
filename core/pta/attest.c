@@ -1,6 +1,8 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: BSD-2-Clause
+//
+// Copyright (c) 2020, Miguel Quaresma
 #include<crypto/crypto.h>
-#include <kernel/huk_subkey.h>
+#include<kernel/huk_subkey.h>
 #include<kernel/pseudo_ta.h>
 #include<kernel/user_ta.h>
 #include<tee/tee_fs.h>
@@ -17,7 +19,7 @@ static struct attest_ctx ctx_i;
 
 /* Signs a binary blob corresponding to the byte representation of a CSR
  */
-static TEE_Result sign_cert_blob(struct attest_ctx *ctx, uint32_t pt, TEE_Param params[4]){
+static TEE_Result sign_cert_blob(uint32_t pt, TEE_Param params[4]){
     void *hash_ctx, *hash_tmp;
     
     uint32_t e_pt = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT, //cert blob
@@ -39,8 +41,7 @@ static TEE_Result sign_cert_blob(struct attest_ctx *ctx, uint32_t pt, TEE_Param 
 
     crypto_hash_free_ctx(hash_ctx);
     
-    
-    if(crypto_acipher_ecc_sign(TEE_ALG_ECDSA_P256, ctx->kp, hash_tmp, 32,
+    if(crypto_acipher_ecc_sign(TEE_ALG_ECDSA_P256, ctx_i.kp, hash_tmp, 32,
                                params[1].memref.buffer, &(params[1].memref.size)))
         return TEE_ERROR_GENERIC;
 
@@ -143,61 +144,72 @@ static TEE_Result create(void){
 }
 
 
+static TEE_Result decrypt_ak(void *ak_blob, size_t ak_l){
+    TEE_Result res = TEE_SUCCESS;
+	void *ctx;
+	uint8_t *key;
+	uint8_t *tmp;
+	size_t b_len = 16;
+
+	key = calloc(b_len, sizeof(uint8_t));
+	if(!key)
+		return TEE_ERROR_OUT_OF_MEMORY;
+
+	tmp = calloc(ak_l, sizeof(uint8_t));
+	if(tmp){
+        res = huk_subkey_derive(HUK_SUBKEY_ACC, NULL, 0, key, b_len);
+
+        if(!res){
+            res = crypto_cipher_alloc_ctx(&ctx, TEE_ALG_AES_CTR);
+
+            if(!res){
+                res = crypto_cipher_init(ctx, TEE_MODE_DECRYPT, key, b_len, NULL, 0, tmp, b_len);
+
+                if(!res){
+                    res = crypto_cipher_update(ctx, TEE_MODE_DECRYPT, 1, (uint8_t*)ak_blob, ak_l, tmp);
+
+                    if(!res){
+                        memcpy((uint8_t*)ak_blob, tmp, ak_l);
+                        memset(tmp, 0, ak_l*sizeof(uint8_t));
+                    }
+                    crypto_cipher_final(ctx);
+                }
+                crypto_cipher_free_ctx(ctx);
+            }
+            memset(key, 0, b_len*sizeof(uint8_t));
+        }
+        free(tmp);
+    } else res = TEE_ERROR_OUT_OF_MEMORY;
+
+    free(key);
+
+    return res;
+}
+
+
 /* Loads the attestation blob i.e. device certificate followed by the attestation
  * key, encrypted using AES-CTR
  */
 TEE_Result import_attestation_key(void *dcak_p, size_t dc_l, size_t ak_l){
 	TEE_Result res = TEE_SUCCESS;
-	void *ctx;
-	uint8_t *key;
-	size_t len = 16;
-	uint8_t *tmp;
-	size_t tmp_l = 16;
 
-	key = calloc(16, sizeof(uint8_t));
-	if(!key)
-		return TEE_ERROR_OUT_OF_MEMORY;
-
-	tmp = calloc(16, sizeof(uint8_t));
-	if(!tmp)
-		return TEE_ERROR_OUT_OF_MEMORY;
-
-	res = huk_subkey_derive(HUK_SUBKEY_ACC, NULL, 0, key, len);
+	res = decrypt_ak((uint8_t*)dcak_p + dc_l, ak_l);
 	if(res)
 		return res;
-
-	res = crypto_cipher_alloc_ctx(&ctx, TEE_ALG_AES_CTR);
-	if(res)
-		return res;
-
-	res = crypto_cipher_init(ctx, TEE_MODE_DECRYPT, key, len, NULL, 0, tmp, tmp_l);
-	if(res)
-		return res;
-
-	res = crypto_cipher_update(ctx, TEE_MODE_DECRYPT, 1, (uint8_t*)dcak_p + dc_l, ak_l, tmp);
-
-	if(res)
-		return res;
-	crypto_cipher_final(ctx);
-	crypto_cipher_free_ctx(ctx);
-
-	memset(key, 0, len*sizeof(uint8_t));
-	free(key);
 
 	ctx_i.kp = calloc(1, sizeof(struct ecc_keypair));
 	if(!ctx_i.kp)
 		return TEE_ERROR_OUT_OF_MEMORY;
 
-	res = crypto_acipher_alloc_ecc_keypair(ctx_i.kp, ak_l*8);
+	res = crypto_acipher_alloc_ecc_keypair(ctx_i.kp, 256);
 	if(res)
 		return res;
 
-	res = crypto_bignum_bin2bn(tmp, tmp_l, ctx_i.kp->d);
+	res = crypto_bignum_bin2bn((uint8_t*)dcak_p + dc_l, ak_l, ctx_i.kp->d);
 	if(res)
 		return res;
 
-	memset(tmp, 0, tmp_l*sizeof(uint8_t));
-	free(tmp);
+    ctx_i.kp->curve = TEE_ECC_CURVE_NIST_P256;
 
 	ctx_i.dc = calloc(dc_l, sizeof(uint8_t));
 	if(!ctx_i.dc)
@@ -210,12 +222,11 @@ TEE_Result import_attestation_key(void *dcak_p, size_t dc_l, size_t ak_l){
 }
 
 
-static TEE_Result invoke_command(void *psess, uint32_t cmd, uint32_t pt, TEE_Param params[4]){
+static TEE_Result invoke_command(void *psess __unused, uint32_t cmd, uint32_t pt, TEE_Param params[4]){
 
     switch(cmd){
     case ATTEST_CMD_SIGN:
-		return TEE_SUCCESS;
-        //return sign_cert_blob(psess, pt, params);
+        return sign_cert_blob(pt, params);
 	case ATTEST_CMD_GET_CERT:
         return dump_dc(pt, params);
     default:
