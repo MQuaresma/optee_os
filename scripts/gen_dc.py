@@ -89,7 +89,7 @@ def gen_dc(ca_crt, ca_k):
     # Signing key
     ak = ak.export_key('NUM')
     bl = math.ceil(ak.bit_length()/8)
-    ak_raw = ak.to_bytes(bl,'little')
+    ak_raw = ak.to_bytes(bl,'big')
     c_ak_txt = format(ak_raw.hex())
 
     # Encrypted attestation key
