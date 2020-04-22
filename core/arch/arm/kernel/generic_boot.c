@@ -1152,9 +1152,9 @@ static void init_attestation_ta(unsigned long dcak_b, size_t dc_l, size_t ak_l){
 	res = import_attestation_key(dcak_p, dc_l, ak_l);
 	if(res)
 		DMSG("Failed to import the attestation certificate");
-	assert(res==0);
 
-	memset(dcak_p, 0, dc_l+ak_l); //overwrite buffer
+	memset(dcak_p, 0, dc_l+ak_l); //zero fill the buffer
+    assert(res==0);
 }
 
 

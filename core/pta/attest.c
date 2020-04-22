@@ -19,7 +19,7 @@ static struct attest_ctx ctx_i;
 
 /* Signs a binary blob corresponding to the byte representation of a CSR
  */
-static TEE_Result sign_cert_blob(uint32_t pt, TEE_Param params[4]){
+static TEE_Result sign_blob(uint32_t pt, TEE_Param params[4]){
     void *hash_ctx, *hash_tmp;
     
     uint32_t e_pt = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT, //cert blob
@@ -226,7 +226,7 @@ static TEE_Result invoke_command(void *psess __unused, uint32_t cmd, uint32_t pt
 
     switch(cmd){
     case ATTEST_CMD_SIGN:
-        return sign_cert_blob(pt, params);
+        return sign_blob(pt, params);
 	case ATTEST_CMD_GET_CERT:
         return dump_dc(pt, params);
     default:
