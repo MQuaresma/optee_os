@@ -320,41 +320,6 @@ LOCAL_FUNC relocate , :
 END_FUNC relocate
 #endif
 
-
-#ifdef CFG_DEVICE_ATTESTATION
-/* void relocate_dckb(void *dck_blob, size_t *dc_l, size_t *ak_b)
- *
- * Copies the buffer stored in dck_blob, with size dc_l + ak_b,
- * to the memory region used to share data between OPTEE and
- * the normal OS
- */
-LOCAL_FUNC relocate_dckb , :
-	mov_imm x3, TEE_SHMEM_START
-	mov_imm x4, TEE_SHMEM_SIZE
-	
-	cmp x1, x4
-	bgt 	end
-	
-	mov x4, x3
-	add x5, x0, x1
-	add x5, x5, x2 /* end of attestation blob */
-loop:
-	ldr x6, [x0], #8
-	str x6, [x4], #8
-			
-	cmp x0,x5
-	blt		loop
-
-
-	mov x21, x3
-	mov x22, x1
-	mov x23, x2
-end:
-	ret
-END_FUNC relocate_dckb
-#endif
-
-
 #ifdef CFG_DEVICE_ATTESTATION
 #define src x0
 #define dst x4
@@ -363,32 +328,35 @@ END_FUNC relocate_dckb
  * Copies the buffer stored in dck_blob, with size dc_l + ak_b,
  * to the memory region used to share data between OPTEE and
  * the normal OS
- * This version uses vector load/store instructions to reduce latency
- * FIXME: handle cases where the buffer is not a multiple of 64 bytes
+ * This version uses double load/store instructions to reduce latency
  */
 LOCAL_FUNC relocate_dckb_vec , :
 	mov_imm x3, TEE_SHMEM_START
 	mov_imm x4, TEE_SHMEM_SIZE
-
 	cmp x1, x4
-	bgt 	end_vec
+	b.gt 	3f
 
 	mov x4, x3
 	add x5, x0, x1
 	add x5, x5, x2 /* end of attestation blob */
-    //sub x5, x5, #16
-loop16b:
-    ldp x6, x7, [src], #16
+    sub x5, x5, #16
+
+1:  ldp x6, x7, [src], #16
     stp x6, x7, [dst], #16
+	cmp src, x5
+	b.lt    1b
 
-	cmp src,x5
-	blt		loop16b
+    add x5, x5, #16
+    b       #12
 
+2:  ldr w6, [src], #4
+    str w6, [dst], #4
+    cmp src, x5
+    b.lt    2b
 
-	mov x21, x3
+3:  mov x21, x3
 	mov x22, x1
 	mov x23, x2
-end_vec:
 	ret
 END_FUNC relocate_dckb_vec
 #endif
