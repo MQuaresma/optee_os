@@ -21,7 +21,6 @@ static struct attest_ctx ctx_i;
  */
 static TEE_Result sign_blob(uint32_t pt, TEE_Param params[4]){
     void *hash_ctx, *hash_tmp;
-    
     uint32_t e_pt = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT, //cert blob
                                     TEE_PARAM_TYPE_MEMREF_OUTPUT, //signature
                                     TEE_PARAM_TYPE_NONE,
@@ -186,14 +185,40 @@ static TEE_Result decrypt_ak(void *ak_blob, size_t ak_l){
     return res;
 }
 
+static TEE_Result bin_2_ecckey(struct ecc_keypair *kp, uint8_t *blob, size_t ak_l){
+    TEE_Result res = TEE_SUCCESS;
+
+	res = crypto_acipher_alloc_ecc_keypair(kp, 256);
+	if(res)
+		return res;
+
+	res = crypto_bignum_bin2bn(blob, ak_l, kp->d);
+	if(res)
+		return res;
+
+    blob += ak_l;
+    res = crypto_bignum_bin2bn(blob, ak_l, kp->x);
+	if(res)
+		return res;
+
+    blob += ak_l;
+    res = crypto_bignum_bin2bn(blob, ak_l, kp->y);
+	if(res)
+		return res;
+
+    kp->curve = TEE_ECC_CURVE_NIST_P256;
+
+    return res;
+}
+
 
 /* Loads the attestation blob i.e. device certificate followed by the attestation
  * key, encrypted using AES-CTR
  */
-TEE_Result import_attestation_key(void *dcak_p, size_t dc_l, size_t ak_l){
+TEE_Result import_attestation_key(void *blob, size_t dc_l, size_t ak_l){
 	TEE_Result res = TEE_SUCCESS;
 
-	res = decrypt_ak((uint8_t*)dcak_p + dc_l, ak_l);
+	res = decrypt_ak((uint8_t*)blob + dc_l, ak_l);
 	if(res)
 		return res;
 
@@ -201,21 +226,13 @@ TEE_Result import_attestation_key(void *dcak_p, size_t dc_l, size_t ak_l){
 	if(!ctx_i.kp)
 		return TEE_ERROR_OUT_OF_MEMORY;
 
-	res = crypto_acipher_alloc_ecc_keypair(ctx_i.kp, 256);
-	if(res)
-		return res;
-
-	res = crypto_bignum_bin2bn((uint8_t*)dcak_p + dc_l, ak_l, ctx_i.kp->d);
-	if(res)
-		return res;
-
-    ctx_i.kp->curve = TEE_ECC_CURVE_NIST_P256;
+    res = bin_2_ecckey(ctx_i.kp, (uint8_t *)blob + dc_l, ak_l);
 
 	ctx_i.dc = calloc(dc_l, sizeof(uint8_t));
 	if(!ctx_i.dc)
 		return TEE_ERROR_OUT_OF_MEMORY;
 
-	memcpy(ctx_i.dc, dcak_p, dc_l);
+	memcpy(ctx_i.dc, blob, dc_l);
 	ctx_i.dc_l = dc_l;
 
 	return res;
