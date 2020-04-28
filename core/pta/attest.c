@@ -59,26 +59,26 @@ static TEE_Result dump_dc(uint32_t pt, TEE_Param params[4]){
     struct tee_file_handle *fh = NULL;
     struct tee_pobj *dc_obj = NULL;
     size_t dc_objs = sizeof(void*);
-	uint32_t e_pt = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_OUTPUT,
-									TEE_PARAM_TYPE_NONE,
-									TEE_PARAM_TYPE_NONE,
-									TEE_PARAM_TYPE_NONE);
-	if(e_pt != pt)
-		return TEE_ERROR_BAD_PARAMETERS;
+    uint32_t e_pt = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_OUTPUT,
+                                    TEE_PARAM_TYPE_NONE,
+                                    TEE_PARAM_TYPE_NONE,
+                                    TEE_PARAM_TYPE_NONE);
+    if(e_pt != pt)
+        return TEE_ERROR_BAD_PARAMETERS;
 
-	res = tee_pobj_get(&uuid,
-					   &uuid, sizeof(TEE_UUID),
+    res = tee_pobj_get(&uuid,
+                       &uuid, sizeof(TEE_UUID),
                        TEE_DATA_FLAG_ACCESS_WRITE | TEE_DATA_FLAG_SHARE_READ | TEE_DATA_FLAG_ACCESS_READ,
-					   false, fops,
-					   &dc_obj);
-	if(!res){
-		res = fops->open(dc_obj, &dc_objs, &fh);
-		if(!(res ^ TEE_ERROR_ITEM_NOT_FOUND) || !(res ^ TEE_ERROR_CORRUPT_OBJECT))
-			return res;
-		res = fops->read(fh, 0, params[0].memref.buffer, &params[0].memref.size);
-		fops->close(&fh);
-		tee_pobj_release(dc_obj);
-	}
+                       false, fops,
+                       &dc_obj);
+    if(!res){
+        res = fops->open(dc_obj, &dc_objs, &fh);
+        if(!(res ^ TEE_ERROR_ITEM_NOT_FOUND) || !(res ^ TEE_ERROR_CORRUPT_OBJECT))
+            return res;
+        res = fops->read(fh, 0, params[0].memref.buffer, &params[0].memref.size);
+        fops->close(&fh);
+        tee_pobj_release(dc_obj);
+    }
 
     return res;
 }
@@ -100,15 +100,15 @@ static TEE_Result open_session(uint32_t pt __unused, TEE_Param params[TEE_NUM_PA
 /* Stores, in secure storage, the device certificate loaded at boot time
  */
 static TEE_Result store_attest_material(struct tee_pobj *kp_pobj, 
-										struct tee_file_handle **fh, 
-										const struct tee_file_operations *fops){
-	TEE_Result res = TEE_SUCCESS;
-	res = fops->create(kp_pobj, true, NULL, 0, NULL, 0, ctx_i.dc, ctx_i.dc_l, fh);
-	if(!res){
-		free(ctx_i.dc);
-		ctx_i.dc = NULL;
-		ctx_i.dc_l = 0;
-	}
+                                        struct tee_file_handle **fh,
+                                        const struct tee_file_operations *fops){
+    TEE_Result res = TEE_SUCCESS;
+    res = fops->create(kp_pobj, true, NULL, 0, NULL, 0, ctx_i.dc, ctx_i.dc_l, fh);
+    if(!res){
+        free(ctx_i.dc);
+        ctx_i.dc = NULL;
+        ctx_i.dc_l = 0;
+    }
 
     return res;
 }
@@ -145,17 +145,17 @@ static TEE_Result create(void){
 
 static TEE_Result decrypt_ak(void *ak_blob, size_t ak_l){
     TEE_Result res = TEE_SUCCESS;
-	void *ctx;
-	uint8_t *key;
-	uint8_t *tmp;
-	size_t b_len = 16;
+    void *ctx;
+    uint8_t *key;
+    uint8_t *tmp;
+    size_t b_len = 16;
 
-	key = calloc(b_len, sizeof(uint8_t));
-	if(!key)
-		return TEE_ERROR_OUT_OF_MEMORY;
+    key = calloc(b_len, sizeof(uint8_t));
+    if(!key)
+        return TEE_ERROR_OUT_OF_MEMORY;
 
-	tmp = calloc(ak_l, sizeof(uint8_t));
-	if(tmp){
+    tmp = calloc(ak_l, sizeof(uint8_t));
+    if(tmp){
         res = huk_subkey_derive(HUK_SUBKEY_ACC, NULL, 0, key, b_len);
 
         if(!res){
@@ -185,28 +185,38 @@ static TEE_Result decrypt_ak(void *ak_blob, size_t ak_l){
     return res;
 }
 
-static TEE_Result bin_2_ecckey(struct ecc_keypair *kp, uint8_t *blob, size_t ak_l){
+
+static inline TEE_Result bin_2_ecckey(uint8_t *blob, size_t ak_l){
     TEE_Result res = TEE_SUCCESS;
+    size_t key_size = ak_l/3;
 
-	res = crypto_acipher_alloc_ecc_keypair(kp, 256);
-	if(res)
-		return res;
+    res = decrypt_ak(blob, key_size);
+    if(res)
+        return res;
 
-	res = crypto_bignum_bin2bn(blob, ak_l, kp->d);
-	if(res)
-		return res;
+    ctx_i.kp = calloc(1, sizeof(struct ecc_keypair));
+    if(!ctx_i.kp)
+        return TEE_ERROR_OUT_OF_MEMORY;
 
-    blob += ak_l;
-    res = crypto_bignum_bin2bn(blob, ak_l, kp->x);
-	if(res)
-		return res;
+    res = crypto_acipher_alloc_ecc_keypair(ctx_i.kp, 256);
+    if(res)
+        return res;
 
-    blob += ak_l;
-    res = crypto_bignum_bin2bn(blob, ak_l, kp->y);
-	if(res)
-		return res;
+    res = crypto_bignum_bin2bn(blob, key_size, ctx_i.kp->d);
+    if(res)
+        return res;
 
-    kp->curve = TEE_ECC_CURVE_NIST_P256;
+    blob += key_size;
+    res = crypto_bignum_bin2bn(blob, key_size, ctx_i.kp->x);
+    if(res)
+        return res;
+
+    blob += key_size;
+    res = crypto_bignum_bin2bn(blob, key_size, ctx_i.kp->y);
+    if(res)
+        return res;
+
+    ctx_i.kp->curve = TEE_ECC_CURVE_NIST_P256;
 
     return res;
 }
@@ -216,26 +226,20 @@ static TEE_Result bin_2_ecckey(struct ecc_keypair *kp, uint8_t *blob, size_t ak_
  * key, encrypted using AES-CTR
  */
 TEE_Result import_attestation_key(void *blob, size_t dc_l, size_t ak_l){
-	TEE_Result res = TEE_SUCCESS;
+    TEE_Result res = TEE_SUCCESS;
 
-	res = decrypt_ak((uint8_t*)blob + dc_l, ak_l);
-	if(res)
-		return res;
+    res = bin_2_ecckey((uint8_t *)blob + dc_l, ak_l);
+    if(res)
+        return res;
 
-	ctx_i.kp = calloc(1, sizeof(struct ecc_keypair));
-	if(!ctx_i.kp)
-		return TEE_ERROR_OUT_OF_MEMORY;
+    ctx_i.dc = calloc(dc_l, sizeof(uint8_t));
+    if(!ctx_i.dc)
+        return TEE_ERROR_OUT_OF_MEMORY;
 
-    res = bin_2_ecckey(ctx_i.kp, (uint8_t *)blob + dc_l, ak_l);
+    memcpy(ctx_i.dc, blob, dc_l);
+    ctx_i.dc_l = dc_l;
 
-	ctx_i.dc = calloc(dc_l, sizeof(uint8_t));
-	if(!ctx_i.dc)
-		return TEE_ERROR_OUT_OF_MEMORY;
-
-	memcpy(ctx_i.dc, blob, dc_l);
-	ctx_i.dc_l = dc_l;
-
-	return res;
+    return res;
 }
 
 
@@ -244,7 +248,7 @@ static TEE_Result invoke_command(void *psess __unused, uint32_t cmd, uint32_t pt
     switch(cmd){
     case ATTEST_CMD_SIGN:
         return sign_blob(pt, params);
-	case ATTEST_CMD_GET_CERT:
+    case ATTEST_CMD_GET_CERT:
         return dump_dc(pt, params);
     default:
         break;

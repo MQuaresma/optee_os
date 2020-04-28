@@ -330,14 +330,12 @@ END_FUNC relocate
  * Copies the buffer stored in dck_blob, with size dc_l + ak_b,
  * to the memory region used to share data between OPTEE and
  * the normal OS
- * This version uses double load/store instructions to reduce latency
+ * This version uses double load/store instructions to reduce the impact
+ * of latency
  */
 LOCAL_FUNC relocate_dckb_vec , :
     mov_imm x3, TEE_SHMEM_START
     mov_imm x4, TEE_SHMEM_SIZE
-    //TODO: optimize with shifts
-    add x1, x1, x2
-    add x1, x1, x2
     add x1, x1, x2
     cmp x1, x4
     b.gt     3f
@@ -360,8 +358,6 @@ LOCAL_FUNC relocate_dckb_vec , :
     b.lt    2b
 
 3:  mov x21, x3
-    sub x1, x1, x2
-    sub x1, x1, x2
     sub x1, x1, x2
     mov x22, x1
     mov x23, x2
