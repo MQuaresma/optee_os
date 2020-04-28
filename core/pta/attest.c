@@ -39,7 +39,7 @@ static TEE_Result sign_blob(uint32_t pt, TEE_Param params[4]){
         return TEE_ERROR_GENERIC;
 
     crypto_hash_free_ctx(hash_ctx);
-    
+
     if(crypto_acipher_ecc_sign(TEE_ALG_ECDSA_P256, ctx_i.kp, hash_tmp, 32,
                                params[1].memref.buffer, &(params[1].memref.size)))
         return TEE_ERROR_GENERIC;

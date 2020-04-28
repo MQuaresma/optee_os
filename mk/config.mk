@@ -483,6 +483,9 @@ CFG_CORE_RESERVED_SHM ?= y
 # paddr_t as a 64-bit type.
 CFG_CORE_LARGE_PHYS_ADDR ?= n
 
+# Enables loading a device certificate for attestation
+CFG_DEVICE_ATTESTATION ?= n
+
 # Define the maximum size, in bits, for big numbers in the Internal Core API
 # Arithmetical functions. This does *not* influence the key size that may be
 # manipulated through the Cryptographic API.
@@ -513,8 +516,13 @@ CFG_TA_MBEDTLS_SELF_TEST ?= y
 # It's also possible to configure to use mbedtls instead of tomcrypt.
 # Then the variables should be assigned as "CFG_CRYPTOLIB_NAME=mbedtls" and
 # "CFG_CRYPTOLIB_DIR=lib/libmbedtls" respectively.
+ifeq ($(CFG_DEVICE_ATTESTATION),y)
+$(call force,CFG_CRYPTOLIB_NAME,mbedtls)
+$(call force,CFG_CRYPTOLIB_DIR,lib/libmbedtls)
+else
 CFG_CRYPTOLIB_NAME ?= tomcrypt
 CFG_CRYPTOLIB_DIR ?= core/lib/libtomcrypt
+endif
 
 # Enable TEE_ALG_RSASSA_PKCS1_V1_5 algorithm for signing with PKCS#1 v1.5 EMSA
 # without ASN.1 around the hash.
@@ -544,9 +552,6 @@ CFG_CORE_HUK_SUBKEY_COMPAT ?= y
 # Compress and encode conf.mk into the TEE core, and show the encoded string on
 # boot (with severity TRACE_INFO).
 CFG_SHOW_CONF_ON_BOOT ?= n
-
-# Enables loading a device certificate for attestation
-CFG_DEVICE_ATTESTATION ?= n
 
 # Enables support for passing a TPM Event Log stored in secure memory
 # to a TA, so a TPM Service could use it to extend any measurement
