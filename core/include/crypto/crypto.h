@@ -231,6 +231,12 @@ TEE_Result crypto_acipher_dsa_verify(uint32_t algo, struct dsa_public_key *key,
 TEE_Result crypto_acipher_ecc_sign(uint32_t algo, struct ecc_keypair *key,
 				   const uint8_t *msg, size_t msg_len,
 				   uint8_t *sig, size_t *sig_len);
+#ifdef CFG_DEVICE_ATTESTATION
+TEE_Result crypto_acipher_ecc_sign_asn(uint32_t algo, struct ecc_keypair *key,
+                                       uint32_t md_alg,
+                                       const uint8_t *msg, size_t msg_len,
+                                       uint8_t *sig, size_t *sig_len);
+#endif
 TEE_Result crypto_acipher_ecc_verify(uint32_t algo, struct ecc_public_key *key,
 				     const uint8_t *msg, size_t msg_len,
 				     const uint8_t *sig, size_t sig_len);

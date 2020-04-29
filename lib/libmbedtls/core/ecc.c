@@ -337,6 +337,7 @@ out:
 	return res;
 }
 
+
 TEE_Result crypto_acipher_ecc_shared_secret(struct ecc_keypair *private_key,
 					    struct ecc_public_key *public_key,
 					    void *secret,
@@ -376,3 +377,61 @@ out:
 	mbedtls_ecdh_free(&ecdh);
 	return res;
 }
+
+#ifdef CFG_DEVICE_ATTESTATION
+TEE_Result crypto_acipher_ecc_sign_asn(uint32_t algo, struct ecc_keypair *key,
+                                       uint32_t md_alg,
+                                       const uint8_t *msg, size_t msg_len,
+                                       uint8_t *sig, size_t *sig_len)
+{
+	TEE_Result res = TEE_SUCCESS;
+	int lmd_res = 0;
+	const mbedtls_pk_info_t *pk_info = NULL;
+	mbedtls_ecdsa_context ecdsa;
+	size_t key_size_bytes = 0;
+	size_t key_size_bits = 0;
+
+	memset(&ecdsa, 0, sizeof(ecdsa));
+
+	if (algo == 0)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	mbedtls_ecdsa_init(&ecdsa);
+	lmd_res = mbedtls_ecp_group_load(&ecdsa.grp, key->curve);
+	if (lmd_res != 0) {
+		res = TEE_ERROR_NOT_SUPPORTED;
+		goto out;
+	}
+
+	ecdsa.d = *(mbedtls_mpi *)key->d;
+
+	res = ecc_get_keysize(key->curve, algo, &key_size_bytes,
+			      &key_size_bits);
+	if (res != TEE_SUCCESS)
+		goto out;
+
+	pk_info = mbedtls_pk_info_from_type(MBEDTLS_PK_ECDSA);
+	if (pk_info == NULL) {
+		res = TEE_ERROR_NOT_SUPPORTED;
+		goto out;
+	}
+
+    //TODO: map the digest algorithm into MBEDS macros
+	lmd_res = mbedtls_ecdsa_write_signature(&ecdsa,
+                                  MBEDTLS_MD_SHA256,
+                                  msg, msg_len,
+                                  sig, sig_len,
+                                  mbd_rand, NULL);
+	if (lmd_res == 0) {
+		res = TEE_SUCCESS;
+	} else {
+		FMSG("mbedtls_ecdsa_sign failed, returned 0x%x\n", -lmd_res);
+		res = TEE_ERROR_GENERIC;
+	}
+out:
+	/* Reset mpi to skip freeing here, those mpis will be freed with key */
+	mbedtls_mpi_init(&ecdsa.d);
+	mbedtls_ecdsa_free(&ecdsa);
+	return res;
+}
+#endif
