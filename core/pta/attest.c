@@ -20,7 +20,7 @@ static struct attest_ctx ctx_i;
 /* Signs a binary blob corresponding to the byte representation of a CSR
  */
 static TEE_Result sign_blob(uint32_t pt, TEE_Param params[4]){
-    void *hash_ctx, *hash_tmp;
+    void *hash_ctx = NULL, *hash_tmp = NULL;
     uint32_t e_pt = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT, //cert blob
                                     TEE_PARAM_TYPE_MEMREF_OUTPUT, //signature
                                     TEE_PARAM_TYPE_NONE,
@@ -147,9 +147,8 @@ static TEE_Result create(void){
 
 static TEE_Result decrypt_ak(void *ak_blob, size_t ak_l){
     TEE_Result res = TEE_SUCCESS;
-    void *ctx;
-    uint8_t *key;
-    uint8_t *tmp;
+    void *ctx = NULL;
+    uint8_t *key = NULL, *tmp = NULL;
     size_t b_len = 16;
 
     key = calloc(b_len, sizeof(uint8_t));

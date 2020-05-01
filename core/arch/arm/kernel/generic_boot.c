@@ -1143,8 +1143,9 @@ void init_tee_runtime(void)
 }
 
 
+#ifdef CFG_DEVICE_ATTESTATION
 static void init_attestation_ta(unsigned long dcak_b, size_t dc_l, size_t ak_l){
-    TEE_Result res;
+    TEE_Result res = TEE_SUCCESS;
 	uint64_t* dcak_p = phys_to_virt(dcak_b, MEM_AREA_NSEC_SHM);
 
     DMSG("Attestation blob at address: %#"PRIx64, dcak_b);
@@ -1156,7 +1157,7 @@ static void init_attestation_ta(unsigned long dcak_b, size_t dc_l, size_t ak_l){
 	memset(dcak_p, 0, dc_l+ak_l); //zero fill the buffer
     assert(res==0);
 }
-
+#endif
 
 static void init_primary_helper(unsigned long pageable_part,
                                 unsigned long nsec_entry, unsigned long fdt,
