@@ -29,6 +29,7 @@ enum shdr_img_type {
  * @sig_size:	size of the signature
  * @hash:	hash of an image
  * @sig:	signature of @hash
+ * @third_party:   third party flag
  */
 struct shdr {
 	uint32_t magic;
@@ -37,6 +38,7 @@ struct shdr {
 	uint32_t algo;
 	uint16_t hash_size;
 	uint16_t sig_size;
+    uint8_t third_party;
 	/*
 	 * Commented out element used to visualize the layout dynamic part
 	 * of the struct.

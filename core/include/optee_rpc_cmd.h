@@ -27,6 +27,20 @@
  */
 #define OPTEE_RPC_CMD_LOAD_TA		0
 
+
+/*
+ * Load TA certificate into memory
+ *
+ * Similarly to loading a TA, the size of the certificate can be queried
+ * with a NULL buffer.
+ *
+ * [in]     value[0].a-b    UUID
+ * [out]    memref[1]       Buffer with TA certificate
+ */
+#define OPTEE_RPC_CMD_LOAD_TA_CERT 12
+
+
+
 /*
  * Replay Protected Memory Block access
  *

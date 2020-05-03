@@ -17,7 +17,8 @@
 
 static struct attest_ctx ctx_i;
 
-/* Signs a binary blob corresponding to the byte representation of a CSR
+/*
+ * Signs a binary blob corresponding to the byte representation of a CSR
  */
 static TEE_Result sign_blob(uint32_t pt, TEE_Param params[4]){
     void *hash_ctx = NULL, *hash_tmp = NULL;
@@ -52,7 +53,8 @@ static TEE_Result sign_blob(uint32_t pt, TEE_Param params[4]){
 }
 
 
-/* Dumps the device certificate in a buffer
+/*
+ * Dumps the device certificate in a buffer
  */
 static TEE_Result dump_dc(uint32_t pt, TEE_Param params[4]){
     TEE_Result res = TEE_SUCCESS;
@@ -86,7 +88,10 @@ static TEE_Result dump_dc(uint32_t pt, TEE_Param params[4]){
 }
 
 
-static TEE_Result open_session(uint32_t pt __unused, TEE_Param params[TEE_NUM_PARAMS] __unused, void **psess_ctx){
+static TEE_Result open_session(uint32_t pt __unused,
+                               TEE_Param params[TEE_NUM_PARAMS] __unused,
+                               void **psess_ctx){
+
     TEE_Result res = TEE_SUCCESS;
     struct tee_ta_session *s = tee_ta_get_calling_session();
 
@@ -94,14 +99,15 @@ static TEE_Result open_session(uint32_t pt __unused, TEE_Param params[TEE_NUM_PA
         return TEE_ERROR_ACCESS_DENIED;
 
     *psess_ctx = &ctx_i;
-    
+
     return res;
 }
 
 
-/* Stores, in secure storage, the device certificate loaded at boot time
+/*
+ * Stores, in secure storage, the device certificate loaded at boot time
  */
-static TEE_Result store_attest_material(struct tee_pobj *kp_pobj, 
+static TEE_Result store_attest_material(struct tee_pobj *kp_pobj,
                                         struct tee_file_handle **fh,
                                         const struct tee_file_operations *fops){
     TEE_Result res = TEE_SUCCESS;
@@ -116,7 +122,8 @@ static TEE_Result store_attest_material(struct tee_pobj *kp_pobj,
 }
 
 
-/* Checks if the device certificate has been stored, and stores it in case it
+/*
+ * Checks if the device certificate has been stored, and stores it in case it
  * hasn't
  */
 static TEE_Result create(void){
@@ -145,6 +152,9 @@ static TEE_Result create(void){
 }
 
 
+/*
+ * Decrypt the attestation key using a sub key derived from the HUK
+ */
 static TEE_Result decrypt_ak(void *ak_blob, size_t ak_l){
     TEE_Result res = TEE_SUCCESS;
     void *ctx = NULL;
@@ -166,7 +176,11 @@ static TEE_Result decrypt_ak(void *ak_blob, size_t ak_l){
                 res = crypto_cipher_init(ctx, TEE_MODE_DECRYPT, key, b_len, NULL, 0, tmp, b_len);
 
                 if(!res){
-                    res = crypto_cipher_update(ctx, TEE_MODE_DECRYPT, 1, (uint8_t*)ak_blob, ak_l, tmp);
+                    res = crypto_cipher_update(ctx,
+                                               TEE_MODE_DECRYPT,
+                                               1,
+                                               (uint8_t*)ak_blob, ak_l,
+                                               tmp);
 
                     if(!res){
                         memcpy((uint8_t*)ak_blob, tmp, ak_l);
@@ -187,6 +201,9 @@ static TEE_Result decrypt_ak(void *ak_blob, size_t ak_l){
 }
 
 
+/*
+ * Convert raw bytes (encrypted private || public ) into an ECC keypair
+ */
 static inline TEE_Result bin_2_ecckey(uint8_t *blob, size_t ak_l){
     TEE_Result res = TEE_SUCCESS;
     size_t key_size = ak_l/3;
@@ -223,8 +240,8 @@ static inline TEE_Result bin_2_ecckey(uint8_t *blob, size_t ak_l){
 }
 
 
-/* Loads the attestation blob i.e. device certificate followed by the attestation
- * key, encrypted using AES-CTR
+/*
+ * Loads the attestation blob into secure memory: device cert || attestation keypair
  */
 TEE_Result import_attestation_key(void *blob, size_t dc_l, size_t ak_l){
     TEE_Result res = TEE_SUCCESS;
@@ -244,7 +261,10 @@ TEE_Result import_attestation_key(void *blob, size_t dc_l, size_t ak_l){
 }
 
 
-static TEE_Result invoke_command(void *psess __unused, uint32_t cmd, uint32_t pt, TEE_Param params[4]){
+static TEE_Result invoke_command(void *psess __unused,
+                                 uint32_t cmd,
+                                 uint32_t pt,
+                                 TEE_Param params[4]){
 
     switch(cmd){
     case ATTEST_CMD_SIGN:

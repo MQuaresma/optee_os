@@ -486,6 +486,9 @@ CFG_CORE_LARGE_PHYS_ADDR ?= n
 # Enables loading a device certificate for attestation
 CFG_DEVICE_ATTESTATION ?= n
 
+# Enables loading third party trusted applications signed with a valid key
+CFG_THIRD_PARTY_TA ?= n
+
 # Define the maximum size, in bits, for big numbers in the Internal Core API
 # Arithmetical functions. This does *not* influence the key size that may be
 # manipulated through the Cryptographic API.

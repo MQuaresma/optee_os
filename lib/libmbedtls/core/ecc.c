@@ -416,7 +416,7 @@ TEE_Result crypto_acipher_ecc_sign_asn(uint32_t algo, struct ecc_keypair *key,
 		goto out;
 	}
 
-    //TODO: map the digest algorithm into MBEDS macros
+    //TODO: map the digest algorithm into MBEDs macros
 	lmd_res = mbedtls_ecdsa_write_signature(&ecdsa,
                                   MBEDTLS_MD_SHA256,
                                   msg, msg_len,

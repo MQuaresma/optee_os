@@ -44,6 +44,7 @@
 #include <mm/mobj.h>
 #include <optee_rpc_cmd.h>
 #include <signed_hdr.h>
+#include <ta_cert_chain.h>
 #include <stdlib.h>
 #include <string.h>
 #include <tee_api_defines_extensions.h>
@@ -124,6 +125,53 @@ exit:
 	return res;
 }
 
+
+#ifdef CFG_THIRD_PARTY_TA
+/*
+ * Load TA certificate via RPC
+ */
+static TEE_Result rpc_load_cert(const TEE_UUID *uuid){
+    TEE_Result res = TEE_SUCCESS;
+    struct thread_param[2] params;
+    struct mobj *mobj = NULL;
+
+    memset(params, 0, sizeof(params));
+    params[0].attr = THREAD_PARAM_ATTR_VALUE_IN;
+    tee_uuid_to_octects((void *)&params[0].u.value, uuid);
+
+    params[1].attr = THREAD_PARAM_ATTR_MEMREF_OUT;
+
+    res = thread_rpc_cmd(OPTEE_RPC_CMD_LOAD_TA_CERT, 2, params);
+    if(res)
+        return res;
+
+
+    mobj = thread_rpc_alloc_payload(params[1].u.memref.size);
+    if(!mobj)
+        return TEE_ERROR_OUT_OF_MEMORY;
+
+    if(mobj->size < params[1].u.memref.size){
+        res = TEE_ERROR_SHORT_BUFFER;
+        goto out;
+    }
+
+    memset(params, 0, sizeof(params));
+    params[0].attr = THREAD_PARAM_ATTR_VALUE_IN;
+    tee_uuid_to_octects((void *)&params[0].u.value, uuid);
+
+    params[1].attr = THREAD_PARAM_ATTR_MEMREF_OUT;
+    params[1].u.memref.offs = 0;
+    params[1].u.memref.size = mobj->size;
+    params[1].u.memref.mobj = mobj;
+
+    res = thread_rpc_cmd(OPTEE_RPC_CMD_LOAD_TA_CERT, 2, params);
+    //TODO: verify certificate chain
+exit:
+    return res;
+}
+#endif
+
+
 static TEE_Result ree_fs_ta_open(const TEE_UUID *uuid,
 				 struct user_ta_store_handle **h)
 {
@@ -153,6 +201,12 @@ static TEE_Result ree_fs_ta_open(const TEE_UUID *uuid,
 		res = TEE_ERROR_SECURITY;
 		goto error_free_payload;
 	}
+
+#ifdef CFG_THIRD_PARTY_TA
+    if(shdr->third_party){
+        res = rpc_load_cert(uuid);
+    }
+#endif
 
 	/* Validate header signature */
 	res = shdr_verify_signature(shdr);
