@@ -164,7 +164,7 @@ def main():
     algo = 0x70414930    # TEE_ALG_RSASSA_PKCS1_PSS_MGF1_SHA256
 
     #TODO: change according to flag value
-    third_party = 1
+    third_party = 0x1
 
     shdr = struct.pack('<IIIIHHB',
                        magic, img_type, img_size, algo, digest_len, sig_len, third_party)

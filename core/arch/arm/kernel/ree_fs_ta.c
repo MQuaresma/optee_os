@@ -132,12 +132,12 @@ exit:
  */
 static TEE_Result rpc_load_cert(const TEE_UUID *uuid){
     TEE_Result res = TEE_SUCCESS;
-    struct thread_param[2] params;
+    struct thread_param params[2];
     struct mobj *mobj = NULL;
 
     memset(params, 0, sizeof(params));
     params[0].attr = THREAD_PARAM_ATTR_VALUE_IN;
-    tee_uuid_to_octects((void *)&params[0].u.value, uuid);
+    tee_uuid_to_octets((void *)&params[0].u.value, uuid);
 
     params[1].attr = THREAD_PARAM_ATTR_MEMREF_OUT;
 
@@ -166,7 +166,7 @@ static TEE_Result rpc_load_cert(const TEE_UUID *uuid){
 
     res = thread_rpc_cmd(OPTEE_RPC_CMD_LOAD_TA_CERT, 2, params);
     //TODO: verify certificate chain
-exit:
+out:
     return res;
 }
 #endif
