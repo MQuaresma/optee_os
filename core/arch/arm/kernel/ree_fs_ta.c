@@ -134,6 +134,7 @@ static TEE_Result rpc_load_cert(const TEE_UUID *uuid){
     TEE_Result res = TEE_SUCCESS;
     struct thread_param params[2];
     struct mobj *mobj = NULL;
+    void *buf;
 
     memset(params, 0, sizeof(params));
     params[0].attr = THREAD_PARAM_ATTR_VALUE_IN;
@@ -144,7 +145,6 @@ static TEE_Result rpc_load_cert(const TEE_UUID *uuid){
     res = thread_rpc_cmd(OPTEE_RPC_CMD_LOAD_TA_CERT, 2, params);
     if(res)
         return res;
-
 
     mobj = thread_rpc_alloc_payload(params[1].u.memref.size);
     if(!mobj)
@@ -157,7 +157,7 @@ static TEE_Result rpc_load_cert(const TEE_UUID *uuid){
 
     memset(params, 0, sizeof(params));
     params[0].attr = THREAD_PARAM_ATTR_VALUE_IN;
-    tee_uuid_to_octects((void *)&params[0].u.value, uuid);
+    tee_uuid_to_octets((void *)&params[0].u.value, uuid);
 
     params[1].attr = THREAD_PARAM_ATTR_MEMREF_OUT;
     params[1].u.memref.offs = 0;
@@ -165,7 +165,9 @@ static TEE_Result rpc_load_cert(const TEE_UUID *uuid){
     params[1].u.memref.mobj = mobj;
 
     res = thread_rpc_cmd(OPTEE_RPC_CMD_LOAD_TA_CERT, 2, params);
+
     //TODO: verify certificate chain
+
 out:
     return res;
 }
@@ -203,7 +205,7 @@ static TEE_Result ree_fs_ta_open(const TEE_UUID *uuid,
 	}
 
 #ifdef CFG_THIRD_PARTY_TA
-    if(shdr->third_party){
+    if(shdr->img_type != SHDR_THIRD_PARTY_TA){
         res = rpc_load_cert(uuid);
     }
 #endif
@@ -213,7 +215,7 @@ static TEE_Result ree_fs_ta_open(const TEE_UUID *uuid,
 	if (res != TEE_SUCCESS)
 		goto error_free_payload;
 	if (shdr->img_type != SHDR_TA && shdr->img_type != SHDR_BOOTSTRAP_TA &&
-	    shdr->img_type != SHDR_ENCRYPTED_TA) {
+	    shdr->img_type != SHDR_ENCRYPTED_TA && shdr->img_type != SHDR_THIRD_PARTY_TA) {
 		res = TEE_ERROR_SECURITY;
 		goto error_free_payload;
 	}

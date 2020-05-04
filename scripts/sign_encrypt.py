@@ -163,11 +163,9 @@ def main():
         img_type = 1         # SHDR_BOOTSTRAP_TA
     algo = 0x70414930    # TEE_ALG_RSASSA_PKCS1_PSS_MGF1_SHA256
 
-    #TODO: change according to flag value
-    third_party = 0x1
+    shdr = struct.pack('<IIIIIHH',
+                       magic, img_type, img_size, algo, key_size, digest_len)
 
-    shdr = struct.pack('<IIIIHHB',
-                       magic, img_type, img_size, algo, digest_len, sig_len, third_party)
     shdr_uuid = args.uuid.bytes
     shdr_version = struct.pack('<I', hdr_version)
 
