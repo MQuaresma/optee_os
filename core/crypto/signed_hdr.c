@@ -44,6 +44,7 @@ struct shdr *shdr_alloc_and_copy(const struct shdr *img, size_t img_size)
 	return shdr;
 }
 
+
 TEE_Result shdr_verify_signature(const struct shdr *shdr)
 {
 	struct rsa_public_key key;

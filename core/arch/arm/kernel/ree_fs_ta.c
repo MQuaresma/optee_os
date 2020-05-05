@@ -130,11 +130,10 @@ exit:
 /*
  * Load TA certificate via RPC
  */
-static TEE_Result rpc_load_cert(const TEE_UUID *uuid){
+static TEE_Result rpc_load_cert(const TEE_UUID *uuid, void **payload){
     TEE_Result res = TEE_SUCCESS;
     struct thread_param params[2];
     struct mobj *mobj = NULL;
-    void *buf;
 
     memset(params, 0, sizeof(params));
     params[0].attr = THREAD_PARAM_ATTR_VALUE_IN;
@@ -166,8 +165,7 @@ static TEE_Result rpc_load_cert(const TEE_UUID *uuid){
 
     res = thread_rpc_cmd(OPTEE_RPC_CMD_LOAD_TA_CERT, 2, params);
 
-    //TODO: verify certificate chain
-
+    *payload = mobj_get_va(mobj, 0);
 out:
     return res;
 }
@@ -187,6 +185,8 @@ static TEE_Result ree_fs_ta_open(const TEE_UUID *uuid,
 	size_t offs;
 	struct shdr_bootstrap_ta *bs_hdr = NULL;
 	struct shdr_encrypted_ta *ehdr = NULL;
+    //struct shdr_thirdparty_ta *tp_hdr = NULL;
+    void *custom_key;
 
 	handle = calloc(1, sizeof(*handle));
 	if (!handle)
@@ -206,7 +206,9 @@ static TEE_Result ree_fs_ta_open(const TEE_UUID *uuid,
 
 #ifdef CFG_THIRD_PARTY_TA
     if(shdr->img_type != SHDR_THIRD_PARTY_TA){
-        res = rpc_load_cert(uuid);
+        res = rpc_load_cert(uuid, &custom_key);
+        if(res)
+            goto error_free_payload;
     }
 #endif
 

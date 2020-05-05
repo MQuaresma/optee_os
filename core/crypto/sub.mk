@@ -9,6 +9,7 @@ endif
 endif
 
 srcs-$(CFG_WITH_USER_TA) += signed_hdr.c
+srcs-$(CFG_THIRD_PARTY_TA) += ta_cert_chain.c
 
 ifeq ($(CFG_WITH_SOFTWARE_PRNG),y)
 srcs-y += rng_fortuna.c

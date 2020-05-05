@@ -8,4 +8,12 @@ void *cert_alloc_and_copy(void *cert, size_t cert_size);
  *
  * Returns TEE_SUCCESS or TEE_ERROR_SECURITY
  */
-TEE_Result verify_cert(void *cert);
+TEE_Result verify_cert(void *payload, size_t len, size_t sig_size, uint32_t algo);
+
+
+/*
+ * Extracts a public key from a buffer of raw bytes
+ *
+ * Returns TEE_SUCCESS, TEE_ERROR_OUT_OF_MEMORY or TEE_ERROR_BAD_FORMAT
+ */
+TEE_Result extract_key(void *cert_raw, void **dst);

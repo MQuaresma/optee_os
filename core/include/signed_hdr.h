@@ -75,6 +75,19 @@ struct shdr_bootstrap_ta {
 	uint32_t ta_version;
 };
 
+#ifdef CFG_THIRD_PART_TA
+/**
+ * struct shdr_thirdparty_ta - third party TA co-subheader
+ *
+ */
+struct shdr_thirdparty_ta {
+    union {
+        size_t ta_pub_key_modulus_size;
+        uint32_t ec_curve;
+    } key_info;
+};
+#endif
+
 /**
  * struct shdr_encrypted_ta - encrypted TA header
  * @enc_algo:	authenticated encyption algorithm, defined by symmetric key
