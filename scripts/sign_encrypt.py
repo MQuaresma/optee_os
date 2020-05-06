@@ -74,6 +74,14 @@ def get_args(logger):
                         type=uuid_parse, help='String UUID of the TA')
     parser.add_argument('--key', required=True,
                         help='Name of signing key file (PEM format)')
+    parser.add_argument('--tp', required=False,
+                        help='Flag to indicate if the key is a third party key')
+    parser.add_argument('--tp-key-type', required=False,
+                        help='Type of the third party key e.g. ECDSA, RSA')
+    parser.add_argument('--tp-cert', required=False,
+                        help='Third party key certificate used by OPTEE in the verification flow')
+    parser.add_argument('--master-key', required=False,
+                        help='Master key used to sign the third party key')
     parser.add_argument('--enc-key', required=False,
                         help='Encryption key string')
     parser.add_argument(
@@ -113,6 +121,14 @@ def get_args(logger):
                     '--out were given.\n' +
                     '  --out will be ignored.')
 
+    if parsed.tp:
+        if not(parsed.master_key) and not(parsed.cert):
+            logger.error('Not master key or third party key provided, exiting...')
+            sys.exit(1)
+        if not(parsed.tp_key_type):
+            logger.warn('No third party key type provided, assuming RSA...')
+            parsed.tp_key_type = 'rsa'
+
     # Set defaults for optional arguments.
 
     if parsed.sigf is None:
@@ -130,19 +146,31 @@ def get_args(logger):
 def main():
     from Cryptodome.Signature import pss
     from Cryptodome.Hash import SHA256
-    from Cryptodome.PublicKey import RSA
+    from Cryptodome.PublicKey import RSA, ECC
     import base64
     import logging
     import os
     import struct
+    import sign_tp_key
+
+    TEE_CURVES_MAP = {
+        'NIST P-256': 0x00000003,
+        'NIST P-384': 0x00000004,
+        'NIST P-521': 0x00000005
+    }
+
 
     logging.basicConfig()
     logger = logging.getLogger(os.path.basename(__file__))
 
     args = get_args(logger)
 
-    with open(args.key, 'rb') as f:
-        key = RSA.importKey(f.read())
+    if args.tp and args.tp_key_type == 'ecdsa':
+        with open(args.key, 'rb') as f:
+            key = ECC.importKey(f.read())
+    else:
+        with open(args.key, 'rb') as f:
+            key = RSA.importKey(f.read())
 
     with open(args.inf, 'rb') as f:
         img = f.read()
@@ -159,12 +187,22 @@ def main():
     magic = 0x4f545348   # SHDR_MAGIC
     if args.enc_key:
         img_type = 2         # SHDR_ENCRYPTED_TA
+    elif args.tp:
+        img_type = 3
     else:
         img_type = 1         # SHDR_BOOTSTRAP_TA
     algo = 0x70414930    # TEE_ALG_RSASSA_PKCS1_PSS_MGF1_SHA256
 
     shdr = struct.pack('<IIIIHH',
                        magic, img_type, img_size, algo, digest_len, sig_len)
+
+    if args.tp:
+        pub_key = key.publickey()
+        if args.tp_key_type == 'ecdsa':
+            key_info = TEE_CURVES_MAP[pub_key.curve]
+        else:
+            key_info = pub_key.size_in_bytes()
+        shdr_tp_key_info = struct.pack('<I', key_info)
 
     shdr_uuid = args.uuid.bytes
     shdr_version = struct.pack('<I', hdr_version)
@@ -180,6 +218,8 @@ def main():
                            enc_algo, flags, len(cipher.nonce), len(tag))
 
     h.update(shdr)
+    if args.tp:
+        h.update(shdr_tp_key_info)
     h.update(shdr_uuid)
     h.update(shdr_version)
     if args.enc_key:
@@ -194,6 +234,8 @@ def main():
             f.write(shdr)
             f.write(img_digest)
             f.write(sig)
+            if args.tp:
+                f.write(shdr_tp_key_info)
             f.write(shdr_uuid)
             f.write(shdr_version)
             if args.enc_key:

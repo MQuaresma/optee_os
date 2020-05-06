@@ -178,7 +178,7 @@ $(foreach f, $(ta-keys), \
 	$(eval $(call copy-file, $(f), $(out-dir)/export-$(sm)/keys)))
 
 # Copy the scripts
-ta-scripts = scripts/sign_encrypt.py scripts/symbolize.py
+ta-scripts = scripts/sign_encrypt.py scripts/symbolize.py scripts/sign_tp_key.py
 $(foreach f, $(ta-scripts), \
 	$(eval $(call copy-file, $(f), $(out-dir)/export-$(sm)/scripts)))
 

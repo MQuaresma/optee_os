@@ -10,7 +10,6 @@
 
 void *cert_alloc_and_copy(void *cert, size_t cert_size){
 
-
 }
 
 TEE_Result verify_cert(void *payload, size_t len, size_t sig_size, uint32_t algo){

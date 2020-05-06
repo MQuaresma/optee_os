@@ -91,11 +91,22 @@ ifeq ($(CFG_ENCRYPT_TA),y)
 crypt-args$(user-ta-uuid) := --enc-key $(TA_ENC_KEY)
 cmd-echo$(user-ta-uuid) := SIGNENC
 endif
+
+ifeq ($(CFG_TP_TA),y)
+M_KEY ?= $(ta-dev-kit-dir$(sm))/keys/default_ta.pem
+ifneq ($(TP_CERT),)
+tp-args$(user-ta-uuid) := --tp --tp-key-type $(TP_KEY_TYPE) --cert $(TP_CERT)
+else
+tp-args$(user-ta-uuid) := --tp --tp-key-type $(TP_KEY_TYPE) --master-key $(M_KEY)
+endif
+endif
+
 $(link-out-dir$(sm))/$(user-ta-uuid).ta: \
 			$(link-out-dir$(sm))/$(user-ta-uuid).stripped.elf \
 			$(TA_SIGN_KEY)
 	@$(cmd-echo-silent) '  $$(cmd-echo$(user-ta-uuid)) $$@'
-	$(q)$(SIGN_ENC) --key $(TA_SIGN_KEY) $$(crypt-args$(user-ta-uuid)) \
+	$(q)$(SIGN_ENC) --key $(TA_SIGN_KEY) $$(tp-args$(user-ta-uuid)) \
+		$$(crypt-args$(user-ta-uuid)) \
 		--uuid $(user-ta-uuid) --ta-version $(user-ta-version) \
 		--in $$< --out $$@
 endef

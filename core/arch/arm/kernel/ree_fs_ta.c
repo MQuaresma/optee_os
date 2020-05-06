@@ -130,7 +130,7 @@ exit:
 /*
  * Load TA certificate via RPC
  */
-static TEE_Result rpc_load_cert(const TEE_UUID *uuid, void **payload){
+static TEE_Result rpc_load_cert(const TEE_UUID *uuid, void **payload, size_t *len){
     TEE_Result res = TEE_SUCCESS;
     struct thread_param params[2];
     struct mobj *mobj = NULL;
@@ -166,6 +166,7 @@ static TEE_Result rpc_load_cert(const TEE_UUID *uuid, void **payload){
     res = thread_rpc_cmd(OPTEE_RPC_CMD_LOAD_TA_CERT, 2, params);
 
     *payload = mobj_get_va(mobj, 0);
+    *len = mobj->size;
 out:
     return res;
 }
@@ -187,6 +188,7 @@ static TEE_Result ree_fs_ta_open(const TEE_UUID *uuid,
 	struct shdr_encrypted_ta *ehdr = NULL;
     //struct shdr_thirdparty_ta *tp_hdr = NULL;
     void *custom_key;
+    size_t custom_key_len;
 
 	handle = calloc(1, sizeof(*handle));
 	if (!handle)
@@ -205,8 +207,12 @@ static TEE_Result ree_fs_ta_open(const TEE_UUID *uuid,
 	}
 
 #ifdef CFG_THIRD_PARTY_TA
-    if(shdr->img_type != SHDR_THIRD_PARTY_TA){
-        res = rpc_load_cert(uuid, &custom_key);
+    if(shdr->img_type == SHDR_THIRD_PARTY_TA){
+        res = rpc_load_cert(uuid, &custom_key, &custom_key_len);
+        if(res)
+            goto error_free_payload;
+
+        res = verify_cert(custom_key, custom_key_len, shdr->sig_size, shdr->algo);
         if(res)
             goto error_free_payload;
     }
