@@ -81,7 +81,7 @@ def main():
             f.write(sig)
             f.write(tp_key_raw)
     else:
-        logger.error('Provided key can\'t be used for signign')
+        logger.error('Provided key can\'t be used for signing')
         sys.exit(1)
 
 

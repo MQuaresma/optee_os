@@ -16,6 +16,15 @@ def int_parse(str):
     return int(str, 0)
 
 
+def serialize_ecdsa_key(key):
+    #TODO: convert to a compabitle format
+    return bytes(32)
+
+def serialize_rsa_key(key):
+    #TODO: convert to a compabitle format
+    return bytes(32)
+
+
 def get_args(logger):
     from argparse import ArgumentParser, RawDescriptionHelpFormatter
     import textwrap
@@ -74,7 +83,7 @@ def get_args(logger):
                         type=uuid_parse, help='String UUID of the TA')
     parser.add_argument('--key', required=True,
                         help='Name of signing key file (PEM format)')
-    parser.add_argument('--tp', required=False,
+    parser.add_argument('-tp', required=False, action='store_true',
                         help='Flag to indicate if the key is a third party key')
     parser.add_argument('--tp-key-type', required=False,
                         help='Type of the third party key e.g. ECDSA, RSA')
@@ -122,8 +131,8 @@ def get_args(logger):
                     '  --out will be ignored.')
 
     if parsed.tp:
-        if not(parsed.master_key) and not(parsed.cert):
-            logger.error('Not master key or third party key provided, exiting...')
+        if not(parsed.master_key) and not(parsed.tp_cert):
+            logger.error('No master key or third party certificate provided, exiting...')
             sys.exit(1)
         if not(parsed.tp_key_type):
             logger.warn('No third party key type provided, assuming RSA...')
@@ -150,6 +159,7 @@ def main():
     import base64
     import logging
     import os
+    import shutil
     import struct
     import sign_tp_key
 
@@ -261,6 +271,9 @@ def main():
             write_image_with_signature(sig)
             logger.info('Successfully signed application.')
 
+            if args.tp:
+                create_ta_cert()
+
     def generate_digest():
         with open(args.digf, 'wb+') as digfile:
             digfile.write(base64.b64encode(img_digest))
@@ -286,6 +299,31 @@ def main():
             else:
                 logger.error('Verification failed, ignoring given signature.')
                 sys.exit(1)
+
+    def create_ta_cert():
+        if args.tp_cert:
+            shutil.copy(args.tp_cert, str(args.uuid) + '.cert')
+        else:
+            with open(args.master_key, 'rb') as f:
+                master_key = RSA.import_key(f.read())
+
+            if not(master_key.has_private()):
+                logger.error('Provided key can\'t be used for signing')
+                sys.exit(1)
+
+            if args.tp_key_type == 'ecdsa':
+                raw_key = serialize_ecdsa_key(key)
+            else:
+                raw_key = serialize_rsa_key(key)
+            md = SHA256.new()
+            md.update(raw_key)
+            signer = pss.new(master_key)
+            sig = signer.sign(md)
+
+            with open(str(args.uuid) + '.cert', 'wb') as f:
+                f.write(sig)
+                f.write(raw_key)
+
 
     # dispatch command
     {

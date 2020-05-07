@@ -4,6 +4,7 @@ link-script-dep$(sm) = $(link-out-dir$(sm))/.ta.ld.d
 
 SIGN_ENC ?= $(ta-dev-kit-dir$(sm))/scripts/sign_encrypt.py
 TA_SIGN_KEY ?= $(ta-dev-kit-dir$(sm))/keys/default_ta.pem
+M_KEY ?= $(ta-dev-kit-dir$(sm))/keys/default_ta.pem
 
 ifeq ($(CFG_ENCRYPT_TA),y)
 # Default TA encryption key is a dummy key derived from default
@@ -93,11 +94,10 @@ cmd-echo$(user-ta-uuid) := SIGNENC
 endif
 
 ifeq ($(CFG_TP_TA),y)
-M_KEY ?= $(ta-dev-kit-dir$(sm))/keys/default_ta.pem
 ifneq ($(TP_CERT),)
-tp-args$(user-ta-uuid) := --tp --tp-key-type $(TP_KEY_TYPE) --cert $(TP_CERT)
+tp-args$(user-ta-uuid) := -tp --tp-key-type $(TP_KEY_TYPE) --tp-cert $(TP_CERT)
 else
-tp-args$(user-ta-uuid) := --tp --tp-key-type $(TP_KEY_TYPE) --master-key $(M_KEY)
+tp-args$(user-ta-uuid) := -tp --tp-key-type $(TP_KEY_TYPE) --master-key $(M_KEY)
 endif
 endif
 
