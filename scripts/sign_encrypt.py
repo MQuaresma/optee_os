@@ -212,7 +212,7 @@ def main():
             key_info = TEE_CURVES_MAP[pub_key.curve]
         else:
             key_info = pub_key.size_in_bytes()
-        shdr_tp_key_info = struct.pack('<I', key_info)
+        shdr_tp_key_info = struct.pack('<Q', key_info)
 
     shdr_uuid = args.uuid.bytes
     shdr_version = struct.pack('<I', hdr_version)

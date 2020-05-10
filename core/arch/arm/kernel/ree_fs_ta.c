@@ -186,7 +186,7 @@ static TEE_Result ree_fs_ta_open(const TEE_UUID *uuid,
 	size_t offs = 0;
 	struct shdr_bootstrap_ta *bs_hdr = NULL;
 	struct shdr_encrypted_ta *ehdr = NULL;
-    //struct shdr_thirdparty_ta *tp_hdr = NULL;
+    struct shdr_thirdparty_ta *tp_hdr = NULL;
     void *custom_key = NULL;
     size_t custom_key_len;
 
@@ -207,16 +207,31 @@ static TEE_Result ree_fs_ta_open(const TEE_UUID *uuid,
 	}
 
 #ifdef CFG_THIRD_PARTY_TA
+    //TODO: free mobj memory
     if(shdr->img_type == SHDR_THIRD_PARTY_TA){
         res = rpc_load_cert(uuid, &custom_key, &custom_key_len);
         if(res)
+            goto error_free_payload;
+
+        custom_key = cert_alloc_and_copy(custom_key, custom_key_len);
+        if(!custom_key)
             goto error_free_payload;
 
         res = verify_cert(custom_key, custom_key_len, shdr->sig_size, shdr->algo);
         if(res)
             goto error_free_payload;
 
-        offs = sizeof(struct shdr_thirdparty_ta);
+        offs = SHDR_GET_SIZE(shdr);
+
+        tp_hdr = calloc(sizeof(*tp_hdr), 1);
+        if(!tp_hdr)
+            goto error_free_payload;
+
+        memcpy(tp_hdr, (uint8_t*)ta + offs, sizeof(*tp_hdr));
+
+        /*if(extract_key(tp_hdr, shdr->sig_size, custom_key, custom_key_len, &custom_key))
+            goto error_free_payload;
+        */
     }
 #endif
 
@@ -244,10 +259,17 @@ static TEE_Result ree_fs_ta_open(const TEE_UUID *uuid,
 	res = crypto_hash_update(hash_ctx, (uint8_t *)shdr, sizeof(*shdr));
 	if (res != TEE_SUCCESS)
 		goto error_free_hash;
-	offs += SHDR_GET_SIZE(shdr);
+    if (shdr->img_type == SHDR_THIRD_PARTY_TA){
+        res = crypto_hash_update(hash_ctx, (uint8_t *)tp_hdr, sizeof(*tp_hdr));
+        if (res != TEE_SUCCESS)
+            goto error_free_hash;
+
+        offs += sizeof(struct shdr_thirdparty_ta);
+    } else offs += SHDR_GET_SIZE(shdr);
 
 	if (shdr->img_type == SHDR_BOOTSTRAP_TA ||
-	    shdr->img_type == SHDR_ENCRYPTED_TA) {
+	    shdr->img_type == SHDR_ENCRYPTED_TA ||
+        shdr->img_type == SHDR_THIRD_PARTY_TA) {
 		TEE_UUID bs_uuid;
 
 		if (ta_size < SHDR_GET_SIZE(shdr) + sizeof(*bs_hdr)) {
@@ -336,6 +358,7 @@ error_free_payload:
 error:
 	free(ehdr);
 	free(bs_hdr);
+    free(tp_hdr);
 	shdr_free(shdr);
 	free(handle);
 	return res;

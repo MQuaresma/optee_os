@@ -90,6 +90,8 @@ TEE_Result extract_key(struct shdr_thirdparty_ta *shdr_ta, size_t sig_size, void
     if(res)
         return TEE_ERROR_SECURITY;
 
+
+    free(cert_raw);
     *dst = key;
 
     return TEE_SUCCESS;
