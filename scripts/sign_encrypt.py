@@ -21,8 +21,8 @@ def serialize_ecdsa_key(key):
     return bytes(32)
 
 def serialize_rsa_key(key):
-    #TODO: convert to a compabitle format
-    return bytes(32)
+    from Cryptodome.Util.number import long_to_bytes
+    return int.to_bytes(key.publickey().e, 4, 'big') + long_to_bytes(key.publickey().n)
 
 
 def get_args(logger):

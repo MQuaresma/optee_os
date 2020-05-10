@@ -81,6 +81,7 @@ out:
 TEE_Result extract_key(struct shdr_thirdparty_ta *shdr_ta, size_t sig_size, void *cert_raw, void **dst){
     TEE_Result res;
     struct rsa_public_key *key;
+    void *key_raw = (uint8_t *)cert_raw + sig_size;
 
     key = calloc(sizeof(struct rsa_public_key), 1);
     if(!key)
@@ -90,9 +91,19 @@ TEE_Result extract_key(struct shdr_thirdparty_ta *shdr_ta, size_t sig_size, void
     if(res)
         return TEE_ERROR_SECURITY;
 
+    res = crypto_bignum_bin2bn((uint8_t *)&key_raw, sizeof(ta_pub_key_exponent), key->e);
+    if (res)
+        goto out;
+
+    key_raw = (uint8_t *)key_raw + sizeof(ta_pub_key_exponent);
+
+    res = crypto_bignum_bin2bn((uint8_t *)&key_raw, shdr_ta->key_info.ta_pub_key_modulus_size, key->n);
+    if (res)
+        goto out;
 
     free(cert_raw);
     *dst = key;
 
+out:
     return TEE_SUCCESS;
 }

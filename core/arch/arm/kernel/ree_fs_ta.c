@@ -229,9 +229,8 @@ static TEE_Result ree_fs_ta_open(const TEE_UUID *uuid,
 
         memcpy(tp_hdr, (uint8_t*)ta + offs, sizeof(*tp_hdr));
 
-        /*if(extract_key(tp_hdr, shdr->sig_size, custom_key, custom_key_len, &custom_key))
+        if(extract_key(tp_hdr, shdr->sig_size, custom_key, &custom_key))
             goto error_free_payload;
-        */
     }
 #endif
 
