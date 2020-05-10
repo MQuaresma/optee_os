@@ -75,7 +75,7 @@ struct shdr_bootstrap_ta {
 	uint32_t ta_version;
 };
 
-#ifdef CFG_THIRD_PART_TA
+#ifdef CFG_THIRD_PARTY_TA
 /**
  * struct shdr_thirdparty_ta - third party TA co-subheader
  *
@@ -151,6 +151,6 @@ static inline void shdr_free(struct shdr *shdr)
  *
  * Returns TEE_SUCCESS on success or TEE_ERROR_SECURITY on failure
  */
-TEE_Result shdr_verify_signature(const struct shdr *shdr);
+TEE_Result shdr_verify_signature(const struct shdr *shdr, void *custom_key);
 
 #endif /*SIGNED_HDR_H*/

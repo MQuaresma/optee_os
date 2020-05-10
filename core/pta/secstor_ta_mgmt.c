@@ -153,7 +153,7 @@ static TEE_Result bootstrap(uint32_t param_types,
 	if (!shdr)
 		return TEE_ERROR_SECURITY;
 
-	res = shdr_verify_signature(shdr);
+	res = shdr_verify_signature(shdr, NULL);
 	if (res)
 		goto out;
 

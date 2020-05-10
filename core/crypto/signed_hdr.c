@@ -45,7 +45,7 @@ struct shdr *shdr_alloc_and_copy(const struct shdr *img, size_t img_size)
 }
 
 
-TEE_Result shdr_verify_signature(const struct shdr *shdr)
+TEE_Result shdr_verify_signature(const struct shdr *shdr, void *custom_key)
 {
 	struct rsa_public_key key;
 	TEE_Result res;
@@ -65,21 +65,24 @@ TEE_Result shdr_verify_signature(const struct shdr *shdr)
 	if (hash_size != shdr->hash_size)
 		return TEE_ERROR_SECURITY;
 
-	res = crypto_acipher_alloc_rsa_public_key(&key, shdr->sig_size);
-	if (res)
-		return TEE_ERROR_SECURITY;
+    if(!custom_key){
+        res = crypto_acipher_alloc_rsa_public_key(&key, shdr->sig_size);
+        if (res)
+            return TEE_ERROR_SECURITY;
 
-	res = crypto_bignum_bin2bn((uint8_t *)&e, sizeof(e), key.e);
-	if (res)
-		goto out;
-	res = crypto_bignum_bin2bn(ta_pub_key_modulus, ta_pub_key_modulus_size,
-				   key.n);
-	if (res)
-		goto out;
+        res = crypto_bignum_bin2bn((uint8_t *)&e, sizeof(e), key.e);
+        if (res)
+            goto out;
+        res = crypto_bignum_bin2bn(ta_pub_key_modulus, ta_pub_key_modulus_size,
+                                   key.n);
+        if (res)
+            goto out;
+    } else key = *(struct rsa_public_key *)custom_key;
 
-	res = crypto_acipher_rsassa_verify(shdr->algo, &key, shdr->hash_size,
-					   SHDR_GET_HASH(shdr), shdr->hash_size,
-					   SHDR_GET_SIG(shdr), shdr->sig_size);
+    res = crypto_acipher_rsassa_verify(shdr->algo, &key, shdr->hash_size,
+                                       SHDR_GET_HASH(shdr), shdr->hash_size,
+                                       SHDR_GET_SIG(shdr), shdr->sig_size);
+
 out:
 	crypto_acipher_free_rsa_public_key(&key);
 	if (res)

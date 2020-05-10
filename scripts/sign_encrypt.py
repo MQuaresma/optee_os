@@ -315,11 +315,9 @@ def main():
                 raw_key = serialize_ecdsa_key(key)
             else:
                 raw_key = serialize_rsa_key(key)
-            md = SHA256.new()
-            md.update(raw_key)
-            signer = pss.new(master_key)
-            sig = signer.sign(md)
 
+            md = SHA256.new(raw_key)
+            sig = pss.new(master_key).sign(md)
             with open(str(args.uuid) + '.cert', 'wb') as f:
                 f.write(sig)
                 f.write(raw_key)

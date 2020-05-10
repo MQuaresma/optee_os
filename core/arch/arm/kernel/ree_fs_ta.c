@@ -138,7 +138,6 @@ static TEE_Result rpc_load_cert(const TEE_UUID *uuid, void **payload, size_t *le
     memset(params, 0, sizeof(params));
     params[0].attr = THREAD_PARAM_ATTR_VALUE_IN;
     tee_uuid_to_octets((void *)&params[0].u.value, uuid);
-
     params[1].attr = THREAD_PARAM_ATTR_MEMREF_OUT;
 
     res = thread_rpc_cmd(OPTEE_RPC_CMD_LOAD_TA_CERT, 2, params);
@@ -154,19 +153,20 @@ static TEE_Result rpc_load_cert(const TEE_UUID *uuid, void **payload, size_t *le
         goto out;
     }
 
-    memset(params, 0, sizeof(params));
-    params[0].attr = THREAD_PARAM_ATTR_VALUE_IN;
-    tee_uuid_to_octets((void *)&params[0].u.value, uuid);
+    *len = params[1].u.memref.size;
 
-    params[1].attr = THREAD_PARAM_ATTR_MEMREF_OUT;
-    params[1].u.memref.offs = 0;
-    params[1].u.memref.size = mobj->size;
-    params[1].u.memref.mobj = mobj;
+    params[0].attr = THREAD_PARAM_ATTR_VALUE_IN;
+	tee_uuid_to_octets((void *)&params[0].u.value, uuid);
+	params[1].attr = THREAD_PARAM_ATTR_MEMREF_OUT;
+	params[1].u.memref.offs = 0;
+	params[1].u.memref.mobj = mobj;
 
     res = thread_rpc_cmd(OPTEE_RPC_CMD_LOAD_TA_CERT, 2, params);
+    if(res)
+        goto out;
 
     *payload = mobj_get_va(mobj, 0);
-    *len = mobj->size;
+
 out:
     return res;
 }
@@ -183,11 +183,11 @@ static TEE_Result ree_fs_ta_open(const TEE_UUID *uuid,
 	struct shdr *ta = NULL;
 	size_t ta_size = 0;
 	TEE_Result res;
-	size_t offs;
+	size_t offs = 0;
 	struct shdr_bootstrap_ta *bs_hdr = NULL;
 	struct shdr_encrypted_ta *ehdr = NULL;
     //struct shdr_thirdparty_ta *tp_hdr = NULL;
-    void *custom_key;
+    void *custom_key = NULL;
     size_t custom_key_len;
 
 	handle = calloc(1, sizeof(*handle));
@@ -215,11 +215,13 @@ static TEE_Result ree_fs_ta_open(const TEE_UUID *uuid,
         res = verify_cert(custom_key, custom_key_len, shdr->sig_size, shdr->algo);
         if(res)
             goto error_free_payload;
+
+        offs = sizeof(struct shdr_thirdparty_ta);
     }
 #endif
 
 	/* Validate header signature */
-	res = shdr_verify_signature(shdr);
+	res = shdr_verify_signature(shdr, custom_key);
 	if (res != TEE_SUCCESS)
 		goto error_free_payload;
 	if (shdr->img_type != SHDR_TA && shdr->img_type != SHDR_BOOTSTRAP_TA &&
@@ -242,7 +244,7 @@ static TEE_Result ree_fs_ta_open(const TEE_UUID *uuid,
 	res = crypto_hash_update(hash_ctx, (uint8_t *)shdr, sizeof(*shdr));
 	if (res != TEE_SUCCESS)
 		goto error_free_hash;
-	offs = SHDR_GET_SIZE(shdr);
+	offs += SHDR_GET_SIZE(shdr);
 
 	if (shdr->img_type == SHDR_BOOTSTRAP_TA ||
 	    shdr->img_type == SHDR_ENCRYPTED_TA) {

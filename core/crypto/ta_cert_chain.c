@@ -6,11 +6,23 @@
 #include<stdlib.h>
 #include<ta_pub_key.h>
 #include<ta_cert_chain.h>
+#include<signed_hdr.h>
+#include<string.h>
 
 
 void *cert_alloc_and_copy(void *cert, size_t cert_size){
+    void *sec_cert = NULL;
+    size_t sec_size = cert_size;
 
+    sec_cert = calloc(cert_size, 1);
+    if(!sec_cert)
+        return NULL;
+
+    memcpy(sec_cert, cert, cert_size);
+
+    return sec_cert;
 }
+
 
 TEE_Result verify_cert(void *payload, size_t len, size_t sig_size, uint32_t algo){
     TEE_Result res;
@@ -40,7 +52,7 @@ TEE_Result verify_cert(void *payload, size_t len, size_t sig_size, uint32_t algo
     if(res)
         goto error_free_md;
 
-    res = crypto_acipher_alloc_rsa_public_key(&key, ta_pub_key_modulus_size);
+    res = crypto_acipher_alloc_rsa_public_key(&key, sig_size);
     if(res)
         goto error_free_md;
 
@@ -48,7 +60,7 @@ TEE_Result verify_cert(void *payload, size_t len, size_t sig_size, uint32_t algo
     if(res)
         goto error_free_rsa_ctx;
 
-    res = crypto_bignum_bin2bn((uint8_t *)ta_pub_key_modulus, ta_pub_key_modulus_size, key.n);
+    res = crypto_bignum_bin2bn(ta_pub_key_modulus, ta_pub_key_modulus_size, key.n);
     if(res)
         goto error_free_rsa_ctx;
 
@@ -66,6 +78,19 @@ out:
     return (res ? TEE_ERROR_SECURITY : TEE_SUCCESS);
 }
 
-TEE_Result extract_key(void *cert_raw, void **dst){
+TEE_Result extract_key(struct shdr_thirdparty_ta *shdr_ta, size_t sig_size, void *cert_raw, void **dst){
+    TEE_Result res;
+    struct rsa_public_key *key;
+
+    key = calloc(sizeof(struct rsa_public_key), 1);
+    if(!key)
+        return TEE_ERROR_SECURITY;
+
+    res = crypto_acipher_alloc_rsa_public_key(key, sig_size);
+    if(res)
+        return TEE_ERROR_SECURITY;
+
+    *dst = key;
+
     return TEE_SUCCESS;
 }
