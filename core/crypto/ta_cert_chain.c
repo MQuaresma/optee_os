@@ -12,7 +12,6 @@
 
 void *cert_alloc_and_copy(void *cert, size_t cert_size){
     void *sec_cert = NULL;
-    size_t sec_size = cert_size;
 
     sec_cert = calloc(cert_size, 1);
     if(!sec_cert)
@@ -98,9 +97,6 @@ TEE_Result extract_key(struct shdr_thirdparty_ta *shdr_ta, size_t sig_size, void
     raw_key = (uint8_t *)raw_key + sizeof(ta_pub_key_exponent);
 
     res = crypto_bignum_bin2bn((uint8_t *)raw_key, shdr_ta->key_info.ta_pub_key_modulus_size, key_p->n);
-    if (res)
-        goto out;
-
 out:
-    return TEE_SUCCESS;
+    return (res ? TEE_ERROR_SECURITY : TEE_SUCCESS);
 }
