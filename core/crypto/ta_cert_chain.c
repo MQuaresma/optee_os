@@ -78,31 +78,28 @@ out:
     return (res ? TEE_ERROR_SECURITY : TEE_SUCCESS);
 }
 
-TEE_Result extract_key(struct shdr_thirdparty_ta *shdr_ta, size_t sig_size, void *cert_raw, void **dst){
+/*
+ * Extracts a third party public key from a certificate with the format (signature || public key)
+ */
+TEE_Result extract_key(struct shdr_thirdparty_ta *shdr_ta, size_t sig_size, void *raw_key, void *key){
     TEE_Result res;
-    struct rsa_public_key *key;
-    void *key_raw = (uint8_t *)cert_raw + sig_size;
+    struct rsa_public_key *key_p = (struct rsa_public_key *)key;
 
-    key = calloc(sizeof(struct rsa_public_key), 1);
-    if(!key)
-        return TEE_ERROR_SECURITY;
-
-    res = crypto_acipher_alloc_rsa_public_key(key, sig_size);
+    res = crypto_acipher_alloc_rsa_public_key(key_p, sig_size);
     if(res)
         return TEE_ERROR_SECURITY;
 
-    res = crypto_bignum_bin2bn((uint8_t *)&key_raw, sizeof(ta_pub_key_exponent), key->e);
+    raw_key = (uint8_t *)raw_key + sig_size;
+
+    res = crypto_bignum_bin2bn((uint8_t *)raw_key, sizeof(ta_pub_key_exponent), key_p->e);
     if (res)
         goto out;
 
-    key_raw = (uint8_t *)key_raw + sizeof(ta_pub_key_exponent);
+    raw_key = (uint8_t *)raw_key + sizeof(ta_pub_key_exponent);
 
-    res = crypto_bignum_bin2bn((uint8_t *)&key_raw, shdr_ta->key_info.ta_pub_key_modulus_size, key->n);
+    res = crypto_bignum_bin2bn((uint8_t *)raw_key, shdr_ta->key_info.ta_pub_key_modulus_size, key_p->n);
     if (res)
         goto out;
-
-    free(cert_raw);
-    *dst = key;
 
 out:
     return TEE_SUCCESS;

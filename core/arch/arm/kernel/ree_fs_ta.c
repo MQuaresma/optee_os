@@ -228,14 +228,11 @@ static TEE_Result ree_fs_ta_open(const TEE_UUID *uuid,
             goto error_free_payload;
 
         memcpy(tp_hdr, (uint8_t*)ta + offs, sizeof(*tp_hdr));
-
-        if(extract_key(tp_hdr, shdr->sig_size, custom_key, &custom_key))
-            goto error_free_payload;
     }
 #endif
 
 	/* Validate header signature */
-	res = shdr_verify_signature(shdr, custom_key);
+	res = shdr_verify_signature(shdr, tp_hdr, custom_key);
 	if (res != TEE_SUCCESS)
 		goto error_free_payload;
 	if (shdr->img_type != SHDR_TA && shdr->img_type != SHDR_BOOTSTRAP_TA &&

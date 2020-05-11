@@ -5,6 +5,7 @@
 
 #include <crypto/crypto.h>
 #include <signed_hdr.h>
+#include <ta_cert_chain.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ta_pub_key.h>
@@ -45,7 +46,7 @@ struct shdr *shdr_alloc_and_copy(const struct shdr *img, size_t img_size)
 }
 
 
-TEE_Result shdr_verify_signature(const struct shdr *shdr, void *custom_key)
+TEE_Result shdr_verify_signature(const struct shdr *shdr, struct shdr_thirdparty_ta *tp_hdr, void *custom_key)
 {
 	struct rsa_public_key key;
 	TEE_Result res;
@@ -65,7 +66,7 @@ TEE_Result shdr_verify_signature(const struct shdr *shdr, void *custom_key)
 	if (hash_size != shdr->hash_size)
 		return TEE_ERROR_SECURITY;
 
-    if(!custom_key){
+    if(shdr->img_type != SHDR_THIRD_PARTY_TA){
         res = crypto_acipher_alloc_rsa_public_key(&key, shdr->sig_size);
         if (res)
             return TEE_ERROR_SECURITY;
@@ -77,7 +78,11 @@ TEE_Result shdr_verify_signature(const struct shdr *shdr, void *custom_key)
                                    key.n);
         if (res)
             goto out;
-    } else key = *(struct rsa_public_key *)custom_key;
+    } else {
+        res = extract_key(tp_hdr, shdr->sig_size, custom_key, &key);
+        if(res)
+            goto out;
+    }
 
     res = crypto_acipher_rsassa_verify(shdr->algo, &key, shdr->hash_size,
                                        SHDR_GET_HASH(shdr), shdr->hash_size,
