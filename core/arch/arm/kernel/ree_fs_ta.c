@@ -208,7 +208,7 @@ static TEE_Result ree_fs_ta_open(const TEE_UUID *uuid,
 
 #ifdef CFG_THIRD_PARTY_TA
     //TODO: free mobj memory
-    if(shdr->img_type == SHDR_THIRD_PARTY_TA){
+    if(shdr->img_type == SHDR_THIRD_PARTY_TA || shdr->img_type == SHDR_THIRD_PARTY_ENC_TA){
         res = rpc_load_cert(uuid, &custom_key, &custom_key_len);
         if(res)
             goto error_free_payload;
@@ -236,7 +236,8 @@ static TEE_Result ree_fs_ta_open(const TEE_UUID *uuid,
 	if (res != TEE_SUCCESS)
 		goto error_free_payload;
 	if (shdr->img_type != SHDR_TA && shdr->img_type != SHDR_BOOTSTRAP_TA &&
-	    shdr->img_type != SHDR_ENCRYPTED_TA && shdr->img_type != SHDR_THIRD_PARTY_TA) {
+	    shdr->img_type != SHDR_ENCRYPTED_TA && shdr->img_type != SHDR_THIRD_PARTY_TA &&
+        shdr->img_type != SHDR_THIRD_PARTY_ENC_TA) {
 		res = TEE_ERROR_SECURITY;
 		goto error_free_payload;
 	}
@@ -255,7 +256,7 @@ static TEE_Result ree_fs_ta_open(const TEE_UUID *uuid,
 	res = crypto_hash_update(hash_ctx, (uint8_t *)shdr, sizeof(*shdr));
 	if (res != TEE_SUCCESS)
 		goto error_free_hash;
-    if (shdr->img_type == SHDR_THIRD_PARTY_TA){
+    if (shdr->img_type == SHDR_THIRD_PARTY_TA || shdr->img_type == SHDR_THIRD_PARTY_ENC_TA){
         res = crypto_hash_update(hash_ctx, (uint8_t *)tp_hdr, sizeof(*tp_hdr));
         if (res != TEE_SUCCESS)
             goto error_free_hash;
@@ -265,7 +266,8 @@ static TEE_Result ree_fs_ta_open(const TEE_UUID *uuid,
 
 	if (shdr->img_type == SHDR_BOOTSTRAP_TA ||
 	    shdr->img_type == SHDR_ENCRYPTED_TA ||
-        shdr->img_type == SHDR_THIRD_PARTY_TA) {
+        shdr->img_type == SHDR_THIRD_PARTY_TA ||
+        shdr->img_type == SHDR_THIRD_PARTY_ENC_TA) {
 		TEE_UUID bs_uuid;
 
 		if (ta_size < SHDR_GET_SIZE(shdr) + sizeof(*bs_hdr)) {
@@ -301,7 +303,7 @@ static TEE_Result ree_fs_ta_open(const TEE_UUID *uuid,
 		handle->bs_hdr = bs_hdr;
 	}
 
-	if (shdr->img_type == SHDR_ENCRYPTED_TA) {
+	if (shdr->img_type == SHDR_ENCRYPTED_TA || shdr->img_type == SHDR_THIRD_PARTY_ENC_TA) {
 		struct shdr_encrypted_ta img_ehdr;
 
 		if (ta_size < SHDR_GET_SIZE(shdr) +
@@ -509,7 +511,7 @@ static TEE_Result ree_fs_ta_read(struct user_ta_store_handle *h, void *data,
 	    next_offs > handle->nw_ta_size)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if (handle->shdr->img_type == SHDR_ENCRYPTED_TA) {
+	if (handle->shdr->img_type == SHDR_ENCRYPTED_TA || handle->shdr->img_type == SHDR_THIRD_PARTY_ENC_TA) {
 		if (data) {
 			dst = data; /* Hash secure buffer */
 			res = tee_ta_decrypt_update(handle->enc_ctx, dst, src,
@@ -557,7 +559,7 @@ static TEE_Result ree_fs_ta_read(struct user_ta_store_handle *h, void *data,
 
 	handle->offs = next_offs;
 	if (handle->offs == handle->nw_ta_size) {
-		if (handle->shdr->img_type == SHDR_ENCRYPTED_TA) {
+		if (handle->shdr->img_type == SHDR_ENCRYPTED_TA || handle->shdr->img_type == SHDR_THIRD_PARTY_ENC_TA) {
 			/*
 			 * Last read: time to finalize authenticated
 			 * decryption.

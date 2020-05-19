@@ -196,11 +196,14 @@ def main():
 
     magic = 0x4f545348   # SHDR_MAGIC
     if args.enc_key:
-        img_type = 2         # SHDR_ENCRYPTED_TA
+        if args.tp:
+            img_type = 4         # SHDR_THIRD_PARTY_ENC_TA
+        else:
+            img_type = 2         # SHDR_ENCRYPTED_TA
     elif args.tp:
-        img_type = 3
+        img_type = 3             # SHDR_THIRD_PARTY_TA
     else:
-        img_type = 1         # SHDR_BOOTSTRAP_TA
+        img_type = 1             # SHDR_BOOTSTRAP_TA
     algo = 0x70414930    # TEE_ALG_RSASSA_PKCS1_PSS_MGF1_SHA256
 
     shdr = struct.pack('<IIIIHH',

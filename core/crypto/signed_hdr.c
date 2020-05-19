@@ -48,6 +48,7 @@ struct shdr *shdr_alloc_and_copy(const struct shdr *img, size_t img_size)
 
 TEE_Result shdr_verify_signature(const struct shdr *shdr, struct shdr_thirdparty_ta *tp_hdr, void *custom_key)
 {
+    //TODO: add support for ECDSA keys
 	struct rsa_public_key key;
 	TEE_Result res;
 	uint32_t e = TEE_U32_TO_BIG_ENDIAN(ta_pub_key_exponent);
@@ -56,7 +57,8 @@ TEE_Result shdr_verify_signature(const struct shdr *shdr, struct shdr_thirdparty
 	if (shdr->magic != SHDR_MAGIC)
 		return TEE_ERROR_SECURITY;
 
-	if (TEE_ALG_GET_MAIN_ALG(shdr->algo) != TEE_MAIN_ALGO_RSA)
+	if (shdr->img_type != SHDR_THIRD_PARTY_TA && shdr->img_type != SHDR_THIRD_PARTY_ENC_TA &&
+        TEE_ALG_GET_MAIN_ALG(shdr->algo) != TEE_MAIN_ALGO_RSA)
 		return TEE_ERROR_SECURITY;
 
 	res = tee_alg_get_digest_size(TEE_DIGEST_HASH_TO_ALGO(shdr->algo),
@@ -66,7 +68,7 @@ TEE_Result shdr_verify_signature(const struct shdr *shdr, struct shdr_thirdparty
 	if (hash_size != shdr->hash_size)
 		return TEE_ERROR_SECURITY;
 
-    if(shdr->img_type != SHDR_THIRD_PARTY_TA){
+    if(shdr->img_type != SHDR_THIRD_PARTY_TA && shdr->img_type != SHDR_THIRD_PARTY_ENC_TA){
         res = crypto_acipher_alloc_rsa_public_key(&key, shdr->sig_size);
         if (res)
             return TEE_ERROR_SECURITY;

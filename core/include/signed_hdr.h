@@ -15,6 +15,7 @@ enum shdr_img_type {
 	SHDR_BOOTSTRAP_TA = 1,
 	SHDR_ENCRYPTED_TA = 2,
     SHDR_THIRD_PARTY_TA = 3,
+    SHDR_THIRD_PARTY_ENC_TA = 4,
 };
 
 #define SHDR_MAGIC	0x4f545348
