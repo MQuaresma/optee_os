@@ -5,13 +5,9 @@
 #include<kernel/huk_subkey.h>
 #include<kernel/pseudo_ta.h>
 #include<kernel/user_ta.h>
-#include<tee/tee_fs.h>
 #include<tee/tee_svc_storage.h>
-#include<tee/tee_svc_cryp.h>
 #include<tee/tee_pobj.h>
-#include<tee/tee_obj.h>
-#include<tee_api_defines.h>
-#include<stdbool.h>
+#include<tee/tee_cryp_utl.h>
 #include<string.h>
 #include<pta_attest.h>
 
@@ -21,35 +17,44 @@ static struct attest_ctx ctx_i;
  * Signs a binary blob corresponding to the byte representation of a CSR
  */
 static TEE_Result sign_blob(uint32_t pt, TEE_Param params[4]){
-    void *hash_ctx = NULL, *hash_tmp = NULL;
+    TEE_Result res = TEE_SUCCESS;
+    void *hash = NULL;
     uint32_t e_pt = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT, //cert blob
                                     TEE_PARAM_TYPE_MEMREF_OUTPUT, //signature
                                     TEE_PARAM_TYPE_NONE,
                                     TEE_PARAM_TYPE_NONE);
 
+    uint32_t ecdsa_alg = TEE_ALG_ECDSA_P256, hash_alg;
+    size_t hash_size = 0;
+
     if(e_pt != pt)
         return TEE_ERROR_BAD_PARAMETERS;
 
-    if(crypto_hash_alloc_ctx(&hash_ctx, TEE_ALG_SHA256) || crypto_hash_init(hash_ctx))
-        return TEE_ERROR_GENERIC;
+    hash_alg = TEE_DIGEST_HASH_TO_ALGO(ecdsa_alg);
 
-    hash_tmp = calloc(32, sizeof(uint8_t));
+    res = tee_alg_get_digest_size(hash_alg, &hash_size);
+    if(res)
+        goto out;
 
-    if(crypto_hash_update(hash_ctx, params[0].memref.buffer, params[0].memref.size) ||
-       crypto_hash_final(hash_ctx, hash_tmp, 32))
-        return TEE_ERROR_GENERIC;
+    hash = calloc(hash_size, 1);
+    if(!hash){
+        res = TEE_ERROR_OUT_OF_MEMORY;
+        goto out;
+    }
 
-    crypto_hash_free_ctx(hash_ctx);
+    res = tee_hash_createdigest(hash_alg, params[0].memref.buffer, params[0].memref.size,
+                                hash, hash_alg);
+    if(res)
+        goto out;
 
-    if(crypto_acipher_ecc_sign_asn(TEE_ALG_ECDSA_P256, ctx_i.kp,
-                                   TEE_ALG_SHA256,
-                                   hash_tmp, 32,
-                                   params[1].memref.buffer, &(params[1].memref.size)))
-        return TEE_ERROR_GENERIC;
+    res = crypto_acipher_ecc_sign_asn(ecdsa_alg, ctx_i.kp,
+                                      hash_alg,
+                                      hash, hash_size,
+                                      params[1].memref.buffer, &(params[1].memref.size));
 
-    free(hash_tmp);
-
-    return TEE_SUCCESS;
+out:
+    free(hash);
+    return res;
 }
 
 
