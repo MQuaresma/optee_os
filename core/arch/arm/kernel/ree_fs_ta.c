@@ -130,10 +130,9 @@ exit:
 /*
  * Load TA certificate via RPC
  */
-static TEE_Result rpc_load_cert(const TEE_UUID *uuid, void **payload, size_t *len){
+static TEE_Result rpc_load_cert(const TEE_UUID *uuid, void **payload, size_t *len, struct mobj **mobj){
     TEE_Result res = TEE_SUCCESS;
     struct thread_param params[2];
-    struct mobj *mobj = NULL;
 
     memset(params, 0, sizeof(params));
     params[0].attr = THREAD_PARAM_ATTR_VALUE_IN;
@@ -144,11 +143,11 @@ static TEE_Result rpc_load_cert(const TEE_UUID *uuid, void **payload, size_t *le
     if(res)
         return res;
 
-    mobj = thread_rpc_alloc_payload(params[1].u.memref.size);
-    if(!mobj)
+    *mobj = thread_rpc_alloc_payload(params[1].u.memref.size);
+    if(!*mobj)
         return TEE_ERROR_OUT_OF_MEMORY;
 
-    if(mobj->size < params[1].u.memref.size){
+    if((*mobj)->size < params[1].u.memref.size){
         res = TEE_ERROR_SHORT_BUFFER;
         goto out;
     }
@@ -159,15 +158,17 @@ static TEE_Result rpc_load_cert(const TEE_UUID *uuid, void **payload, size_t *le
 	tee_uuid_to_octets((void *)&params[0].u.value, uuid);
 	params[1].attr = THREAD_PARAM_ATTR_MEMREF_OUT;
 	params[1].u.memref.offs = 0;
-	params[1].u.memref.mobj = mobj;
+	params[1].u.memref.mobj = *mobj;
 
     res = thread_rpc_cmd(OPTEE_RPC_CMD_LOAD_TA_CERT, 2, params);
     if(res)
         goto out;
 
-    *payload = mobj_get_va(mobj, 0);
+    *payload = mobj_get_va(*mobj, 0);
 
 out:
+    if(res != TEE_SUCCESS)
+        thread_rpc_free_payload(*mobj);
     return res;
 }
 #endif
@@ -179,6 +180,7 @@ static TEE_Result ree_fs_ta_open(const TEE_UUID *uuid,
 	struct ree_fs_ta_handle *handle;
 	struct shdr *shdr = NULL;
 	struct mobj *mobj = NULL;
+    struct mobj *ta_cert_mobj = NULL;
 	void *hash_ctx = NULL;
 	struct shdr *ta = NULL;
 	size_t ta_size = 0;
@@ -207,17 +209,18 @@ static TEE_Result ree_fs_ta_open(const TEE_UUID *uuid,
 	}
 
 #ifdef CFG_THIRD_PARTY_TA
-    //TODO: free mobj memory
     if(shdr->img_type == SHDR_THIRD_PARTY_TA || shdr->img_type == SHDR_THIRD_PARTY_ENC_TA){
-        res = rpc_load_cert(uuid, &custom_key, &custom_key_len);
+        res = rpc_load_cert(uuid, &custom_key, &custom_key_len, &ta_cert_mobj);
         if(res)
             goto error_free_payload;
 
         custom_key = cert_alloc_and_copy(custom_key, custom_key_len);
+        thread_rpc_free_payload(ta_cert_mobj);
         if(!custom_key)
             goto error_free_payload;
 
         res = verify_cert(custom_key, custom_key_len, shdr->sig_size, shdr->algo);
+        
         if(res)
             goto error_free_payload;
 
