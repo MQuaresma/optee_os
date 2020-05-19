@@ -15,6 +15,7 @@
 #include <mbedtls/pk.h>
 #include <stdlib.h>
 #include <string.h>
+#include <utee_defines.h>
 
 #include "mbd_rand.h"
 
@@ -416,12 +417,11 @@ TEE_Result crypto_acipher_ecc_sign_asn(uint32_t algo, struct ecc_keypair *key,
 		goto out;
 	}
 
-    //TODO: map the digest algorithm into MBEDs macros
 	lmd_res = mbedtls_ecdsa_write_signature(&ecdsa,
-                                  MBEDTLS_MD_SHA256,
-                                  msg, msg_len,
-                                  sig, sig_len,
-                                  mbd_rand, NULL);
+                                            TEE_ALG_GET_MAIN_ALG(md_alg) + MBEDTLS_MD_MD4,
+                                            msg, msg_len,
+                                            sig, sig_len,
+                                            mbd_rand, NULL);
 	if (lmd_res == 0) {
 		res = TEE_SUCCESS;
 	} else {
