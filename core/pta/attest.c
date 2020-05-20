@@ -30,7 +30,7 @@ static TEE_Result sign_blob(uint32_t pt, TEE_Param params[4]){
     if(e_pt != pt)
         return TEE_ERROR_BAD_PARAMETERS;
 
-    hash_alg = TEE_DIGEST_HASH_TO_ALGO(ecdsa_alg);
+    hash_alg = TEE_DIGEST_HASH_TO_ALGO(ecdsa_alg) + 1;
 
     res = tee_alg_get_digest_size(hash_alg, &hash_size);
     if(res)
