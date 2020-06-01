@@ -3,6 +3,9 @@
 // Copyright (c) 2020, Miguel Quaresma
 #include<signed_hdr.h>
 
+/*
+ * Allocates secure memory to copy the certificate to, from shared memory
+ */
 void *cert_alloc_and_copy(void *cert, size_t cert_size);
 
 /*
@@ -12,9 +15,8 @@ void *cert_alloc_and_copy(void *cert, size_t cert_size);
  */
 TEE_Result verify_cert(void *payload, size_t len, size_t sig_size, uint32_t algo);
 
-
 /*
- * Extracts a public key from a buffer of raw bytes
+ * Extracts a public key from a buffer of raw bytes with the format: signature || public key
  *
  * Returns TEE_SUCCESS, TEE_ERROR_OUT_OF_MEMORY or TEE_ERROR_BAD_FORMAT
  */

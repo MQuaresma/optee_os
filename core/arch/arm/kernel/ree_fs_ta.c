@@ -128,7 +128,7 @@ exit:
 
 #ifdef CFG_THIRD_PARTY_TA
 /*
- * Load TA certificate via RPC
+ * Loads the certificate for a third party TA via an RPC
  */
 static TEE_Result rpc_load_cert(const TEE_UUID *uuid, void **payload, size_t *len, struct mobj **mobj){
     TEE_Result res = TEE_SUCCESS;
@@ -209,6 +209,7 @@ static TEE_Result ree_fs_ta_open(const TEE_UUID *uuid,
 	}
 
 #ifdef CFG_THIRD_PARTY_TA
+    /* Check if the TA requires a third party certificate for validation */
     if(shdr->img_type == SHDR_THIRD_PARTY_TA || shdr->img_type == SHDR_THIRD_PARTY_ENC_TA){
         res = rpc_load_cert(uuid, &custom_key, &custom_key_len, &ta_cert_mobj);
         if(res)

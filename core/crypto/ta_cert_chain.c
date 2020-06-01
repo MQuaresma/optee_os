@@ -77,9 +77,7 @@ out:
     return (res ? TEE_ERROR_SECURITY : TEE_SUCCESS);
 }
 
-/*
- * Extracts a third party public key from a certificate with the format (signature || public key)
- */
+
 TEE_Result extract_key(struct shdr_thirdparty_ta *shdr_ta, size_t sig_size, void *raw_key, void *key){
     TEE_Result res;
     struct rsa_public_key *key_p = (struct rsa_public_key *)key;

@@ -13,14 +13,12 @@
 
 static struct attest_ctx ctx_i;
 
-/*
- * Signs a binary blob corresponding to the byte representation of a CSR
- */
+
 static TEE_Result sign_blob(uint32_t pt, TEE_Param params[4]){
     TEE_Result res = TEE_SUCCESS;
     void *hash = NULL;
-    uint32_t e_pt = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT, //cert blob
-                                    TEE_PARAM_TYPE_MEMREF_OUTPUT, //signature
+    uint32_t e_pt = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,  // Data
+                                    TEE_PARAM_TYPE_MEMREF_OUTPUT, // Signature
                                     TEE_PARAM_TYPE_NONE,
                                     TEE_PARAM_TYPE_NONE);
 
@@ -58,9 +56,6 @@ out:
 }
 
 
-/*
- * Dumps the device certificate in a buffer
- */
 static TEE_Result dump_dc(uint32_t pt, TEE_Param params[4]){
     TEE_Result res = TEE_SUCCESS;
     TEE_UUID uuid = PTA_ATTEST_UUID;
@@ -68,7 +63,7 @@ static TEE_Result dump_dc(uint32_t pt, TEE_Param params[4]){
     struct tee_file_handle *fh = NULL;
     struct tee_pobj *dc_obj = NULL;
     size_t dc_objs = sizeof(void*);
-    uint32_t e_pt = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_OUTPUT,
+    uint32_t e_pt = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_OUTPUT, //Device certificate
                                     TEE_PARAM_TYPE_NONE,
                                     TEE_PARAM_TYPE_NONE,
                                     TEE_PARAM_TYPE_NONE);
@@ -126,7 +121,6 @@ static TEE_Result store_attest_material(struct tee_pobj *kp_pobj,
     return res;
 }
 
-
 /*
  * Checks if the device certificate has been stored, and stores it in case it
  * hasn't
@@ -158,7 +152,7 @@ static TEE_Result create(void){
 
 
 /*
- * Decrypt the attestation key using a sub key derived from the HUK
+ * Decrypts the attestation key using a sub key derived from the HUK
  */
 static TEE_Result decrypt_ak(void *ak_blob, size_t ak_l){
     TEE_Result res = TEE_SUCCESS;
@@ -172,6 +166,7 @@ static TEE_Result decrypt_ak(void *ak_blob, size_t ak_l){
 
     tmp = calloc(ak_l, sizeof(uint8_t));
     if(tmp){
+        // Generate/derive the sub-HUK key
         res = huk_subkey_derive(HUK_SUBKEY_ACC, NULL, 0, key, b_len);
 
         if(!res){
